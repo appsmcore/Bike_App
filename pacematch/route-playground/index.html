@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PaceMatch Route Playground</title>
+  </head>
+  <body>
+    <div id="app">
+      <aside class="panel">
+        <h1>Route playground</h1>
+        <p class="hint">
+          Fast Node/Vite tester. Click map to add waypoints. Same routing rules as the Flutter app.
+        </p>
+
+        <label>
+          Bike type
+          <select id="bikeType">
+            <option value="road">Road</option>
+            <option value="mtb">MTB</option>
+            <option value="gravel">Gravel</option>
+            <option value="touring">Touring</option>
+            <option value="ebike">E-Bike</option>
+          </select>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="flexible" />
+          Allow any surface
+        </label>
+
+        <div class="stats">
+          <div><span>Distance</span><strong id="distance">—</strong></div>
+          <div><span>Climb</span><strong id="climb">—</strong></div>
+          <div><span>Engine</span><strong id="engine">—</strong></div>
+        </div>
+
+        <p id="status" class="status"></p>
+        <p id="error" class="error"></p>
+
+        <div class="actions">
+          <button type="button" id="undo">Undo</button>
+          <button type="button" id="clear">Clear</button>
+          <button type="button" id="route" class="primary">Calculate</button>
+        </div>
+
+        <p class="hint small">
+          Keys in <code>.env</code>: <code>VITE_GH_API_KEY</code>,
+          <code>VITE_ORS_API_KEY</code>. Free GraphHopper cannot use custom
+          rules — paid plan or ORS fallback.
+        </p>
+      </aside>
+      <div id="map"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

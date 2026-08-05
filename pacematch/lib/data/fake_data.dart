@@ -1,0 +1,212 @@
+import 'package:flutter/material.dart';
+
+import 'models.dart';
+
+DateTime _thisWeekend(int weekday, {int hour = 8}) {
+  final now = DateTime.now();
+  final daysUntil = (weekday - now.weekday + 7) % 7;
+  final day = DateTime(now.year, now.month, now.day)
+      .add(Duration(days: daysUntil == 0 ? 7 : daysUntil));
+  return DateTime(day.year, day.month, day.day, hour, 0);
+}
+
+DateTime _inDays(int days, {int hour = 9}) {
+  final now = DateTime.now().add(Duration(days: days));
+  return DateTime(now.year, now.month, now.day, hour, 0);
+}
+
+List<Ride> createDemoRides() => [
+      Ride(
+        id: 'ride-road-1',
+        title: 'Dolomites Road Loop',
+        description:
+            'Classic South Tyrol climb day. No-drop until the last climb. Coffee stop in Kastelruth.',
+        startsAt: _thisWeekend(DateTime.saturday, hour: 7),
+        meetingPoint: 'Bolzano Train Station',
+        bikeType: BikeType.road,
+        distanceKm: 95,
+        elevationM: 1800,
+        participants: 12,
+        riderLimit: 20,
+        difficulty: Difficulty.challenging,
+        skillLevel: FitnessLevel.advanced,
+        groupId: 'g1',
+        groupName: 'Sunday Road Riders',
+        coverGradient: const [Color(0xFF1A7A4C), Color(0xFF0B3D28)],
+        elevationProfile: const [200, 320, 480, 900, 1100, 850, 600, 350, 220],
+        startLat: 46.4983,
+        startLng: 11.3548,
+      ),
+      Ride(
+        id: 'ride-mtb-1',
+        title: 'Mendel Enduro Trails',
+        description:
+            'Flow trails above Kaltern. Intermediate tech, shuttle optional. Bring pads.',
+        startsAt: _thisWeekend(DateTime.saturday, hour: 9),
+        meetingPoint: 'Kaltern Cable Car',
+        bikeType: BikeType.mtb,
+        distanceKm: 40,
+        elevationM: 1300,
+        participants: 8,
+        riderLimit: 12,
+        difficulty: Difficulty.moderate,
+        skillLevel: FitnessLevel.intermediate,
+        groupId: 'g3',
+        groupName: 'Bolzano MTB Crew',
+        coverGradient: const [Color(0xFF3D5A40), Color(0xFF1B2E1E)],
+        elevationProfile: const [400, 700, 950, 1200, 800, 1100, 600, 450],
+        startLat: 46.4135,
+        startLng: 11.2412,
+      ),
+      Ride(
+        id: 'ride-gravel-1',
+        title: 'Adige Gravel Cruise',
+        description:
+            'Riverside gravel with gentle rollers. Perfect match for intermediate pace.',
+        startsAt: _thisWeekend(DateTime.sunday, hour: 8),
+        meetingPoint: 'Merano Thermal Baths',
+        bikeType: BikeType.gravel,
+        distanceKm: 70,
+        elevationM: 900,
+        participants: 6,
+        riderLimit: 15,
+        difficulty: Difficulty.moderate,
+        skillLevel: FitnessLevel.intermediate,
+        groupId: 'g4',
+        groupName: 'Dolomites Gravel Club',
+        coverGradient: const [Color(0xFF6B8F71), Color(0xFF2F4A35)],
+        elevationProfile: const [180, 240, 360, 520, 480, 390, 300, 210],
+        startLat: 46.6713,
+        startLng: 11.1595,
+      ),
+      Ride(
+        id: 'ride-easy-1',
+        title: 'City Sunrise Spin',
+        description: 'Easy social ride for newcomers. Flat path along the Isarco.',
+        startsAt: _inDays(2, hour: 7),
+        meetingPoint: 'Piazza Walther, Bolzano',
+        bikeType: BikeType.road,
+        distanceKm: 28,
+        elevationM: 180,
+        participants: 15,
+        riderLimit: 25,
+        difficulty: Difficulty.easy,
+        skillLevel: FitnessLevel.beginner,
+        groupId: 'g1',
+        groupName: 'Sunday Road Riders',
+        coverGradient: const [Color(0xFF4C8C6A), Color(0xFF214C36)],
+        elevationProfile: const [150, 160, 180, 200, 190, 170, 155],
+        startLat: 46.4981,
+        startLng: 11.3547,
+      ),
+      Ride(
+        id: 'ride-expert-1',
+        title: 'South Tyrol Climbers',
+        description:
+            'Passo Sella & Pordoi. Strong legs required. Drop ride after km 40.',
+        startsAt: _thisWeekend(DateTime.sunday, hour: 6),
+        meetingPoint: 'Canazei Parking',
+        bikeType: BikeType.road,
+        distanceKm: 110,
+        elevationM: 2800,
+        participants: 9,
+        riderLimit: 12,
+        difficulty: Difficulty.expert,
+        skillLevel: FitnessLevel.expert,
+        groupId: 'g2',
+        groupName: 'South Tyrol Climbers',
+        coverGradient: const [Color(0xFF244B5A), Color(0xFF0F2430)],
+        elevationProfile: const [500, 900, 1400, 1800, 1200, 2000, 1600, 900, 600],
+        startLat: 46.4769,
+        startLng: 11.7702,
+      ),
+      Ride(
+        id: 'ride-ebike-1',
+        title: 'Alpe di Siusi Explore',
+        description: 'E-bike friendly alpine meadows. Photo stops included.',
+        startsAt: _inDays(4, hour: 10),
+        meetingPoint: 'Seis Cable Car',
+        bikeType: BikeType.ebike,
+        distanceKm: 35,
+        elevationM: 700,
+        participants: 10,
+        riderLimit: 16,
+        difficulty: Difficulty.easy,
+        skillLevel: FitnessLevel.beginner,
+        groupId: 'g3',
+        groupName: 'Bolzano MTB Crew',
+        coverGradient: const [Color(0xFF5A7D6A), Color(0xFF2A4034)],
+        elevationProfile: const [900, 1000, 1150, 1300, 1250, 1100, 980],
+        startLat: 46.5422,
+        startLng: 11.5317,
+      ),
+    ];
+
+List<CyclingGroup> createDemoGroups() => [
+      CyclingGroup(
+        id: 'g1',
+        name: 'Sunday Road Riders',
+        description:
+            'Weekend road rides around Bolzano. All levels welcome on easy days.',
+        memberCount: 48,
+        isPrivate: false,
+        location: 'Bolzano',
+        upcomingRideIds: ['ride-road-1', 'ride-easy-1'],
+        coverGradient: const [Color(0xFF1A7A4C), Color(0xFF103D28)],
+      ),
+      CyclingGroup(
+        id: 'g2',
+        name: 'South Tyrol Climbers',
+        description: 'Big alpine days. Strong climbers only.',
+        memberCount: 22,
+        isPrivate: true,
+        location: 'South Tyrol',
+        upcomingRideIds: ['ride-expert-1'],
+        coverGradient: const [Color(0xFF244B5A), Color(0xFF102430)],
+      ),
+      CyclingGroup(
+        id: 'g3',
+        name: 'Bolzano MTB Crew',
+        description: 'Trails, enduro, and after-ride pizza.',
+        memberCount: 61,
+        isPrivate: false,
+        location: 'Bolzano',
+        upcomingRideIds: ['ride-mtb-1', 'ride-ebike-1'],
+        coverGradient: const [Color(0xFF3D5A40), Color(0xFF1A2A1C)],
+      ),
+      CyclingGroup(
+        id: 'g4',
+        name: 'Dolomites Gravel Club',
+        description: 'Gravel adventures through vineyards and high plateaus.',
+        memberCount: 34,
+        isPrivate: false,
+        location: 'Merano',
+        upcomingRideIds: ['ride-gravel-1'],
+        coverGradient: const [Color(0xFF6B8F71), Color(0xFF2E4534)],
+      ),
+    ];
+
+const demoProfile = UserProfile(
+  name: 'Alex Rider',
+  email: 'alex@pacematch.app',
+  location: 'Bolzano, South Tyrol',
+  bio: 'Road & gravel. Looking for Saturday climbs and easy Sunday spins.',
+  bikeTypes: [BikeType.road, BikeType.gravel],
+  fitnessLevel: FitnessLevel.intermediate,
+  preferredDistanceMin: 40,
+  preferredDistanceMax: 100,
+  preferredElevationMin: 200,
+  preferredElevationMax: 2000,
+  preferredTerrains: [TerrainPref.flat, TerrainPref.climbs],
+  preferredDays: ['Sat', 'Sun'],
+  ridesJoined: 14,
+  ridesOrganized: 2,
+  reliabilityScore: 96,
+  communityScore: 78,
+  badges: [
+    'First Ride',
+    '10 Group Rides',
+    'Community Rider',
+    'Gravel Explorer',
+  ],
+);

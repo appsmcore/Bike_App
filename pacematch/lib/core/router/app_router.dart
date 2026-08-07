@@ -9,7 +9,10 @@ import '../../features/groups/group_detail_screen.dart';
 import '../../features/groups/groups_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
+import '../../features/profile/companions_screen.dart';
+import '../../features/profile/my_rides_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/profile/rider_profile_screen.dart';
 import '../../data/models.dart';
 import '../../data/route_models.dart';
 import '../../features/rides/create_ride_screen.dart';
@@ -128,6 +131,22 @@ class AppRouter {
                 GoRoute(
                   path: '/profile',
                   builder: (context, _) => const ProfileScreen(),
+                  routes: [
+                    GoRoute(
+                      path: 'my-rides',
+                      builder: (context, _) => const MyRidesScreen(),
+                    ),
+                    GoRoute(
+                      path: 'companions',
+                      builder: (context, _) => const CompanionsScreen(),
+                    ),
+                    GoRoute(
+                      path: 'rider/:id',
+                      builder: (context, state) => RiderProfileScreen(
+                        riderId: state.pathParameters['id']!,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

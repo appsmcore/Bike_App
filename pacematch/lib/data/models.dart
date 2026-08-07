@@ -107,6 +107,7 @@ class Ride {
     required this.elevationProfile,
     required this.startLat,
     required this.startLng,
+    this.organizerId,
     this.routeLatLngs = const [],
   });
 
@@ -129,10 +130,121 @@ class Ride {
   final double startLat;
   final double startLng;
 
+  /// User id of who offered the ride. Null for legacy demo rows without one.
+  final String? organizerId;
+
   /// Route geometry as [lat, lng, lat, lng, ...] pairs. Empty = start pin only.
   final List<double> routeLatLngs;
 
   bool get hasRoute => routeLatLngs.length >= 4;
+
+  bool get isPast => startsAt.isBefore(DateTime.now());
+}
+
+/// Public rider card used for co-riders and profile peeks.
+class RiderProfile {
+  const RiderProfile({
+    required this.id,
+    required this.name,
+    required this.location,
+    required this.bio,
+    required this.bikeTypes,
+    required this.fitnessLevel,
+    required this.ridesJoined,
+    required this.ridesOrganized,
+    required this.reliabilityScore,
+    required this.communityScore,
+    required this.badges,
+    this.accentColor = const Color(0xFF1A7A4C),
+    this.tagline,
+  });
+
+  final String id;
+  final String name;
+  final String location;
+  final String bio;
+  final List<BikeType> bikeTypes;
+  final FitnessLevel fitnessLevel;
+  final int ridesJoined;
+  final int ridesOrganized;
+  final int reliabilityScore;
+  final int communityScore;
+  final List<String> badges;
+  final Color accentColor;
+  final String? tagline;
+
+  String get initial => name.isNotEmpty ? name[0].toUpperCase() : '?';
+}
+
+/// Aggregated shared riding stats with one companion.
+class CompanionStats {
+  const CompanionStats({
+    required this.rider,
+    required this.sharedRides,
+    required this.sharedKm,
+    required this.sharedElevationM,
+    required this.longestRideKm,
+    required this.biggestClimbM,
+    required this.morningRides,
+    required this.weekendRides,
+    required this.hardRides,
+  });
+
+  final RiderProfile rider;
+  final int sharedRides;
+  final double sharedKm;
+  final int sharedElevationM;
+  final double longestRideKm;
+  final int biggestClimbM;
+  final int morningRides;
+  final int weekendRides;
+  final int hardRides;
+}
+
+enum CompanionRankMetric {
+  sharedKm,
+  sharedElevation,
+  sharedRides,
+  longestRide,
+  biggestClimb,
+  earlyBird,
+  weekendWarrior,
+  climbDuo,
+}
+
+extension CompanionRankMetricX on CompanionRankMetric {
+  String get label => switch (this) {
+        CompanionRankMetric.sharedKm => 'Most km together',
+        CompanionRankMetric.sharedElevation => 'Most elevation together',
+        CompanionRankMetric.sharedRides => 'Most rides together',
+        CompanionRankMetric.longestRide => 'Longest shared ride',
+        CompanionRankMetric.biggestClimb => 'Biggest climb together',
+        CompanionRankMetric.earlyBird => 'Early-bird buddies',
+        CompanionRankMetric.weekendWarrior => 'Weekend warriors',
+        CompanionRankMetric.climbDuo => 'Climb crusher duo',
+      };
+
+  String get subtitle => switch (this) {
+        CompanionRankMetric.sharedKm => 'Who rolled the most distance with you',
+        CompanionRankMetric.sharedElevation => 'Who suffered the most vertical with you',
+        CompanionRankMetric.sharedRides => 'Your most frequent co-riders',
+        CompanionRankMetric.longestRide => 'Partners on your longest days',
+        CompanionRankMetric.biggestClimb => 'Who climbed the steepest with you',
+        CompanionRankMetric.earlyBird => 'Most rides starting before 8:00',
+        CompanionRankMetric.weekendWarrior => 'Most Sat/Sun rides together',
+        CompanionRankMetric.climbDuo => 'Most challenging+ rides together',
+      };
+
+  IconData get icon => switch (this) {
+        CompanionRankMetric.sharedKm => Icons.route,
+        CompanionRankMetric.sharedElevation => Icons.terrain,
+        CompanionRankMetric.sharedRides => Icons.groups,
+        CompanionRankMetric.longestRide => Icons.straighten,
+        CompanionRankMetric.biggestClimb => Icons.trending_up,
+        CompanionRankMetric.earlyBird => Icons.wb_sunny_outlined,
+        CompanionRankMetric.weekendWarrior => Icons.weekend_outlined,
+        CompanionRankMetric.climbDuo => Icons.landscape_outlined,
+      };
 }
 
 class CyclingGroup {
@@ -159,6 +271,7 @@ class CyclingGroup {
 
 class UserProfile {
   const UserProfile({
+    required this.id,
     required this.name,
     required this.email,
     required this.location,
@@ -179,6 +292,7 @@ class UserProfile {
     this.bikePhotoBytes,
   });
 
+  final String id;
   final String name;
   final String email;
   final String location;
@@ -198,7 +312,23 @@ class UserProfile {
   final List<String> badges;
   final Uint8List? bikePhotoBytes;
 
+  RiderProfile toPublicRider() => RiderProfile(
+        id: id,
+        name: name,
+        location: location,
+        bio: bio,
+        bikeTypes: bikeTypes,
+        fitnessLevel: fitnessLevel,
+        ridesJoined: ridesJoined,
+        ridesOrganized: ridesOrganized,
+        reliabilityScore: reliabilityScore,
+        communityScore: communityScore,
+        badges: badges,
+        tagline: 'That’s you',
+      );
+
   UserProfile copyWith({
+    String? id,
     String? name,
     String? email,
     String? location,
@@ -220,6 +350,7 @@ class UserProfile {
     bool clearBikePhoto = false,
   }) {
     return UserProfile(
+      id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
       location: location ?? this.location,

@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
 import '../../data/route_models.dart';
+import '../../services/geocoding_service.dart';
+import '../../shared/widgets/meeting_point_field.dart';
 import '../../shared/widgets/rides_map_view.dart';
 import 'route_planner_screen.dart';
 
@@ -26,10 +28,11 @@ class CreateRideScreen extends StatefulWidget {
 class _CreateRideScreenState extends State<CreateRideScreen> {
   final _title = TextEditingController();
   final _description = TextEditingController();
-  final _meeting = TextEditingController(text: 'Bolzano Train Station');
-  final _distance = TextEditingController(text: '50');
-  final _elevation = TextEditingController(text: '800');
+  final _meeting = TextEditingController();
+  final _distance = TextEditingController();
+  final _elevation = TextEditingController();
   final _limit = TextEditingController(text: '12');
+  final _geocoder = GeocodingService();
 
   late DateTime _startsAt;
   BikeType _bike = BikeType.road;
@@ -37,6 +40,10 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
   FitnessLevel _skill = FitnessLevel.intermediate;
   String? _groupId;
   PlannedRoute? _plannedRoute;
+  LatLng? _meetingPoint;
+  int _meetingResolveId = 0;
+
+  bool get _hasPlannedRoute => _plannedRoute != null;
 
   @override
   void initState() {
@@ -58,6 +65,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     _distance.dispose();
     _elevation.dispose();
     _limit.dispose();
+    _geocoder.dispose();
     super.dispose();
   }
 
@@ -68,6 +76,34 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       route.distanceKm == route.distanceKm.roundToDouble() ? 0 : 1,
     );
     _elevation.text = '${route.elevationM}';
+    _meetingPoint = route.start;
+    _fillMeetingFromRouteStart(route.start);
+  }
+
+  void _clearPlannedRoute() {
+    setState(() {
+      _plannedRoute = null;
+      _distance.clear();
+      _elevation.clear();
+    });
+  }
+
+  Future<void> _fillMeetingFromRouteStart(LatLng start) async {
+    final id = ++_meetingResolveId;
+    try {
+      final label = await _geocoder.reverse(start);
+      if (!mounted || id != _meetingResolveId) return;
+      if (label == null || label.isEmpty) {
+        _meeting.text =
+            '${start.latitude.toStringAsFixed(5)}, ${start.longitude.toStringAsFixed(5)}';
+      } else {
+        _meeting.text = label;
+      }
+    } catch (_) {
+      if (!mounted || id != _meetingResolveId) return;
+      _meeting.text =
+          '${start.latitude.toStringAsFixed(5)}, ${start.longitude.toStringAsFixed(5)}';
+    }
   }
 
   Future<void> _openPlanner() async {
@@ -126,8 +162,31 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       );
       return;
     }
+    if (_meeting.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a meeting point')),
+      );
+      return;
+    }
 
     final planned = _plannedRoute;
+    final distanceKm = double.tryParse(_distance.text.trim());
+    final elevationM = int.tryParse(_elevation.text.trim());
+    if (distanceKm == null || distanceKm <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter distance (km)')),
+      );
+      return;
+    }
+    if (elevationM == null || elevationM < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter elevation (m)')),
+      );
+      return;
+    }
+
+    final start = planned?.start ?? _meetingPoint;
+
     final ride = state.createRide(
       title: _title.text.trim(),
       description: _description.text.trim().isEmpty
@@ -136,14 +195,14 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       startsAt: _startsAt,
       meetingPoint: _meeting.text.trim(),
       bikeType: _bike,
-      distanceKm: double.tryParse(_distance.text) ?? 50,
-      elevationM: int.tryParse(_elevation.text) ?? 800,
+      distanceKm: distanceKm,
+      elevationM: elevationM,
       riderLimit: int.tryParse(_limit.text) ?? 12,
       difficulty: _difficulty,
       skillLevel: _skill,
       groupId: groupId,
-      startLat: planned?.start.latitude,
-      startLng: planned?.start.longitude,
+      startLat: start?.latitude,
+      startLng: start?.longitude,
       elevationProfile: (planned != null && planned.elevationProfile.isNotEmpty)
           ? planned.elevationProfile
           : null,
@@ -193,9 +252,12 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
             trailing: const Icon(Icons.event),
             onTap: _pickDateTime,
           ),
-          TextField(
+          MeetingPointField(
             controller: _meeting,
-            decoration: const InputDecoration(labelText: 'Meeting point'),
+            biasNear: _plannedRoute?.start ?? _meetingPoint,
+            onPlaceSelected: (place) {
+              setState(() => _meetingPoint = place.point);
+            },
           ),
           const SizedBox(height: 12),
           if (options.isNotEmpty && selectedGroupId != null)
@@ -232,7 +294,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                   const SizedBox(height: 6),
                   Text(
                     _plannedRoute == null
-                        ? 'Plan on the map — distance & climb are calculated from waypoints for your bike type.'
+                        ? 'Optional — plan on the map to lock distance & climb from the route. Meeting point is filled from the start.'
                         : '${_plannedRoute!.distanceKm.toStringAsFixed(1)} km · '
                             '${_plannedRoute!.elevationM} m · '
                             '${_plannedRoute!.waypoints.length} waypoints'
@@ -240,12 +302,26 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
-                    onPressed: _openPlanner,
-                    icon: const Icon(Icons.map_outlined),
-                    label: Text(
-                      _plannedRoute == null ? 'Plan route on map' : 'Edit route',
-                    ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: _openPlanner,
+                        icon: const Icon(Icons.map_outlined),
+                        label: Text(
+                          _plannedRoute == null
+                              ? 'Plan route on map'
+                              : 'Edit route',
+                        ),
+                      ),
+                      if (_plannedRoute != null)
+                        TextButton.icon(
+                          onPressed: _clearPlannedRoute,
+                          icon: const Icon(Icons.close),
+                          label: const Text('Clear route'),
+                        ),
+                    ],
                   ),
                   if (_plannedRoute != null &&
                       _plannedRoute!.geometry.length >= 2) ...[
@@ -287,10 +363,17 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
               Expanded(
                 child: TextField(
                   controller: _distance,
-                  keyboardType: TextInputType.number,
+                  readOnly: _hasPlannedRoute,
+                  enableInteractiveSelection: !_hasPlannedRoute,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Distance km',
-                    helperText: _plannedRoute != null ? 'From map route' : null,
+                    hintText: _hasPlannedRoute ? null : 'Enter manually',
+                    helperText: _hasPlannedRoute
+                        ? 'Locked from map route'
+                        : 'Editable until a route is planned',
                   ),
                 ),
               ),
@@ -298,10 +381,15 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
               Expanded(
                 child: TextField(
                   controller: _elevation,
+                  readOnly: _hasPlannedRoute,
+                  enableInteractiveSelection: !_hasPlannedRoute,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Elevation m',
-                    helperText: _plannedRoute != null ? 'From map route' : null,
+                    hintText: _hasPlannedRoute ? null : 'Enter manually',
+                    helperText: _hasPlannedRoute
+                        ? 'Locked from map route'
+                        : 'Editable until a route is planned',
                   ),
                 ),
               ),

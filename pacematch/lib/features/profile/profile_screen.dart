@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -161,6 +162,30 @@ class ProfileScreen extends StatelessWidget {
             'Days: ${profile.preferredDays.join(', ')}',
           ),
           const SizedBox(height: 24),
+          Text('Your riding life', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 12),
+          _ProfileNavCard(
+            icon: Icons.history,
+            title: 'My rides',
+            subtitle:
+                '${state.completedRides.length} done · ${state.offeredRides.length} offered · ${state.upcomingJoinedRides.length} upcoming',
+            onTap: () => context.push('/profile/my-rides'),
+          ),
+          const SizedBox(height: 10),
+          _ProfileNavCard(
+            icon: Icons.emoji_events_outlined,
+            title: 'Riding companions',
+            subtitle: () {
+              final top =
+                  state.companionsRankedBy(CompanionRankMetric.sharedKm);
+              if (top.isEmpty) {
+                return 'Rank who you’ve shared the most km & climbs with';
+              }
+              return 'Top buddy: ${top.first.rider.name.split(' ').first}';
+            }(),
+            onTap: () => context.push('/profile/companions'),
+          ),
+          const SizedBox(height: 24),
           Text('Stats', style: theme.textTheme.titleLarge),
           const SizedBox(height: 12),
           Row(
@@ -181,6 +206,20 @@ class ProfileScreen extends StatelessWidget {
               _StatCard(
                 label: 'Community',
                 value: '${profile.communityScore}',
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _StatCard(
+                label: 'Lifetime km',
+                value: '${state.lifetimeJoinedKm.round()}',
+              ),
+              const SizedBox(width: 10),
+              _StatCard(
+                label: 'Lifetime elev',
+                value: '${state.lifetimeJoinedElevationM}',
               ),
             ],
           ),
@@ -210,6 +249,73 @@ class ProfileScreen extends StatelessWidget {
             style: theme.textTheme.bodySmall,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProfileNavCard extends StatelessWidget {
+  const _ProfileNavCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.cardTheme.color,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.outline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.forest.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AppColors.forest),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

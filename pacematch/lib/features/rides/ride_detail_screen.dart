@@ -8,6 +8,7 @@ import '../../data/app_state.dart';
 import '../../data/models.dart';
 import '../../shared/widgets/elevation_profile_chart.dart';
 import '../../shared/widgets/ride_card.dart';
+import '../../shared/widgets/rider_widgets.dart';
 import '../../shared/widgets/rides_map_view.dart';
 
 class RideDetailScreen extends StatelessWidget {
@@ -140,6 +141,8 @@ class RideDetailScreen extends StatelessWidget {
                     current: rsvp,
                     onChanged: (status) => state.setRsvp(ride.id, status),
                   ),
+                  const SizedBox(height: 28),
+                  _ConfirmedRidersSection(rideId: ride.id),
                   const SizedBox(height: 24),
                   TextButton(
                     onPressed: () => context.push('/groups/${ride.groupId}'),
@@ -152,6 +155,89 @@ class RideDetailScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ConfirmedRidersSection extends StatelessWidget {
+  const _ConfirmedRidersSection({required this.rideId});
+
+  final String rideId;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final theme = Theme.of(context);
+    final canSee = state.canSeeParticipants(rideId);
+    final riders = state.confirmedRidersFor(rideId);
+    final ride = state.rideById(rideId);
+    final organizerId = ride?.organizerId;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text("Who's riding", style: theme.textTheme.titleLarge),
+            ),
+            if (canSee && riders.isNotEmpty)
+              Text(
+                '${riders.length} confirmed',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: AppColors.forest,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (!canSee) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.cardTheme.color,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.colorScheme.outline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Profiles unlock when you join',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Confirm with Join to see who’s coming and open their profiles.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ] else if (riders.isEmpty) ...[
+          Text(
+            'You’re the first one in — invite the crew.',
+            style: theme.textTheme.bodyMedium,
+          ),
+        ] else ...[
+          Text(
+            'Tap a rider to open their profile.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          for (final rider in riders)
+            RiderTile(
+              rider: rider,
+              isYou: rider.id == state.currentUserId,
+              isOrganizer: rider.id == organizerId,
+              onTap: () => context.push('/profile/rider/${rider.id}'),
+            ),
+        ],
+      ],
     );
   }
 }

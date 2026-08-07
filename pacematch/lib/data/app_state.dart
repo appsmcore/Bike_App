@@ -15,11 +15,21 @@ class AppState extends ChangeNotifier {
     'ride-road-1': RsvpStatus.joined,
     'ride-gravel-1': RsvpStatus.joined,
     'ride-mtb-1': RsvpStatus.maybe,
+    'ride-past-1': RsvpStatus.joined,
+    'ride-past-2': RsvpStatus.joined,
+    'ride-past-3': RsvpStatus.joined,
+    'ride-past-4': RsvpStatus.joined,
+    'ride-past-5': RsvpStatus.joined,
+    'ride-offered-1': RsvpStatus.joined,
+    'ride-offered-2': RsvpStatus.joined,
   };
   final Set<String> joinedGroupIds = {'g1', 'g3'};
 
   late final List<Ride> _rides = createDemoRides();
   late final List<CyclingGroup> _groups = createDemoGroups();
+  late final List<RiderProfile> _riders = createDemoRiders();
+  late final Map<String, List<String>> _rideParticipantIds =
+      createDemoRideParticipants();
 
   // Onboarding draft
   final Set<BikeType> draftBikes = {BikeType.road};
@@ -32,14 +42,19 @@ class AppState extends ChangeNotifier {
     TerrainPref.climbs,
   };
 
+  String get currentUserId => profile.id;
+
   List<Ride> get rides => List.unmodifiable(_rides);
   List<CyclingGroup> get groups => List.unmodifiable(_groups);
+  List<RiderProfile> get riders => List.unmodifiable(_riders);
 
   /// Your groups first, then others — by start time within each bucket.
+  /// Past rides are kept out of the home finder.
   List<Ride> get recommendedRides {
     final mine = <Ride>[];
     final others = <Ride>[];
     for (final ride in _rides) {
+      if (ride.isPast) continue;
       if (joinedGroupIds.contains(ride.groupId)) {
         mine.add(ride);
       } else {
@@ -68,18 +83,79 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  RiderProfile? riderById(String id) {
+    if (id == currentUserId) return profile.toPublicRider();
+    try {
+      return _riders.firstWhere((r) => r.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
   RsvpStatus rsvpFor(String rideId) => rsvps[rideId] ?? RsvpStatus.none;
 
   bool hasJoinedRsvp(String rideId) => rsvpFor(rideId) == RsvpStatus.joined;
 
   bool hasMaybeRsvp(String rideId) => rsvpFor(rideId) == RsvpStatus.maybe;
 
+  /// Confirmed riders for a ride. Only available once you've joined.
+  List<RiderProfile> confirmedRidersFor(String rideId, {bool includeSelf = true}) {
+    if (!hasJoinedRsvp(rideId) && !isOrganizerOf(rideId)) {
+      return const [];
+    }
+    final ids = _rideParticipantIds[rideId] ?? const <String>[];
+    final riders = <RiderProfile>[];
+    final seen = <String>{};
+
+    if (includeSelf && hasJoinedRsvp(rideId)) {
+      riders.add(profile.toPublicRider());
+      seen.add(currentUserId);
+    }
+
+    for (final id in ids) {
+      if (seen.contains(id)) continue;
+      final rider = riderById(id);
+      if (rider != null) {
+        riders.add(rider);
+        seen.add(id);
+      }
+    }
+
+    final ride = rideById(rideId);
+    final organizerId = ride?.organizerId;
+    if (organizerId != null && !seen.contains(organizerId)) {
+      final organizer = riderById(organizerId);
+      if (organizer != null) {
+        riders.insert(0, organizer);
+      }
+    }
+
+    return riders;
+  }
+
+  bool canSeeParticipants(String rideId) =>
+      hasJoinedRsvp(rideId) || isOrganizerOf(rideId);
+
+  bool isOrganizerOf(String rideId) {
+    final ride = rideById(rideId);
+    return ride?.organizerId == currentUserId;
+  }
+
   void setRsvp(String rideId, RsvpStatus status) {
+    final previous = rsvpFor(rideId);
     if (status == RsvpStatus.none) {
       rsvps.remove(rideId);
     } else {
       rsvps[rideId] = status;
     }
+
+    final list = _rideParticipantIds.putIfAbsent(rideId, () => <String>[]);
+    if (status == RsvpStatus.joined && previous != RsvpStatus.joined) {
+      if (!list.contains(currentUserId)) list.add(currentUserId);
+    } else if (status != RsvpStatus.joined && previous == RsvpStatus.joined) {
+      list.remove(currentUserId);
+    }
+
     notifyListeners();
   }
 
@@ -245,6 +321,7 @@ class AppState extends ChangeNotifier {
       skillLevel: skillLevel,
       groupId: groupId,
       groupName: group?.name ?? 'Open ride',
+      organizerId: currentUserId,
       coverGradient: group?.coverGradient ??
           const [Color(0xFF1A7A4C), Color(0xFF0B3D28)],
       elevationProfile: elevationProfile ?? _syntheticProfile(elevationM),
@@ -255,6 +332,7 @@ class AppState extends ChangeNotifier {
     _rides.insert(0, ride);
     group?.upcomingRideIds.insert(0, id);
     rsvps[id] = RsvpStatus.joined;
+    _rideParticipantIds[id] = [currentUserId];
     profile = profile.copyWith(ridesOrganized: profile.ridesOrganized + 1);
     if (group != null && !joinedGroupIds.contains(groupId)) {
       joinedGroupIds.add(groupId);
@@ -289,8 +367,10 @@ class AppState extends ChangeNotifier {
     Difficulty? difficulty,
     DateTime? day,
     DateTime? month,
+    bool includePast = false,
   }) {
     return _rides.where((ride) {
+      if (!includePast && ride.isPast) return false;
       if (bikeType != null && ride.bikeType != bikeType) return false;
       if (difficulty != null && ride.difficulty != difficulty) return false;
       if (day != null) {
@@ -316,6 +396,138 @@ class AppState extends ChangeNotifier {
   }
 
   List<Ride> ridesOnDay(DateTime day) {
-    return filteredRides(day: day);
+    return filteredRides(day: day, includePast: true);
   }
+
+  /// Past rides you joined (completed).
+  List<Ride> get completedRides {
+    final list = _rides
+        .where((r) => r.isPast && hasJoinedRsvp(r.id))
+        .toList()
+      ..sort((a, b) => b.startsAt.compareTo(a.startsAt));
+    return list;
+  }
+
+  /// Rides you offered / organized.
+  List<Ride> get offeredRides {
+    final list = _rides
+        .where((r) => r.organizerId == currentUserId)
+        .toList()
+      ..sort((a, b) => b.startsAt.compareTo(a.startsAt));
+    return list;
+  }
+
+  /// Upcoming rides you've confirmed.
+  List<Ride> get upcomingJoinedRides {
+    final list = _rides
+        .where((r) => !r.isPast && hasJoinedRsvp(r.id))
+        .toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    return list;
+  }
+
+  double get lifetimeJoinedKm =>
+      completedRides.fold(0.0, (sum, r) => sum + r.distanceKm);
+
+  int get lifetimeJoinedElevationM =>
+      completedRides.fold(0, (sum, r) => sum + r.elevationM);
+
+  List<Ride> _sharedPastRidesWith(String riderId) {
+    return completedRides.where((ride) {
+      final others = _rideParticipantIds[ride.id] ?? const <String>[];
+      return others.contains(riderId) || ride.organizerId == riderId;
+    }).toList();
+  }
+
+  List<CompanionStats> get companionStats {
+    final byRider = <String, CompanionStats>{};
+
+    for (final ride in completedRides) {
+      final ids = <String>{
+        ...(_rideParticipantIds[ride.id] ?? const <String>[]),
+        if (ride.organizerId != null) ride.organizerId!,
+      }..remove(currentUserId);
+
+      final isMorning = ride.startsAt.hour < 8;
+      final isWeekend = ride.startsAt.weekday == DateTime.saturday ||
+          ride.startsAt.weekday == DateTime.sunday;
+      final isHard = ride.difficulty == Difficulty.challenging ||
+          ride.difficulty == Difficulty.expert;
+
+      for (final id in ids) {
+        final rider = riderById(id);
+        if (rider == null) continue;
+        final existing = byRider[id];
+        if (existing == null) {
+          byRider[id] = CompanionStats(
+            rider: rider,
+            sharedRides: 1,
+            sharedKm: ride.distanceKm,
+            sharedElevationM: ride.elevationM,
+            longestRideKm: ride.distanceKm,
+            biggestClimbM: ride.elevationM,
+            morningRides: isMorning ? 1 : 0,
+            weekendRides: isWeekend ? 1 : 0,
+            hardRides: isHard ? 1 : 0,
+          );
+        } else {
+          byRider[id] = CompanionStats(
+            rider: rider,
+            sharedRides: existing.sharedRides + 1,
+            sharedKm: existing.sharedKm + ride.distanceKm,
+            sharedElevationM: existing.sharedElevationM + ride.elevationM,
+            longestRideKm: ride.distanceKm > existing.longestRideKm
+                ? ride.distanceKm
+                : existing.longestRideKm,
+            biggestClimbM: ride.elevationM > existing.biggestClimbM
+                ? ride.elevationM
+                : existing.biggestClimbM,
+            morningRides: existing.morningRides + (isMorning ? 1 : 0),
+            weekendRides: existing.weekendRides + (isWeekend ? 1 : 0),
+            hardRides: existing.hardRides + (isHard ? 1 : 0),
+          );
+        }
+      }
+    }
+
+    return byRider.values.toList();
+  }
+
+  List<CompanionStats> companionsRankedBy(CompanionRankMetric metric) {
+    final list = List<CompanionStats>.from(companionStats);
+    int valueOf(CompanionStats c) => switch (metric) {
+          CompanionRankMetric.sharedKm => c.sharedKm.round(),
+          CompanionRankMetric.sharedElevation => c.sharedElevationM,
+          CompanionRankMetric.sharedRides => c.sharedRides,
+          CompanionRankMetric.longestRide => c.longestRideKm.round(),
+          CompanionRankMetric.biggestClimb => c.biggestClimbM,
+          CompanionRankMetric.earlyBird => c.morningRides,
+          CompanionRankMetric.weekendWarrior => c.weekendRides,
+          CompanionRankMetric.climbDuo => c.hardRides,
+        };
+
+    list.removeWhere((c) => valueOf(c) <= 0);
+    list.sort((a, b) {
+      final cmp = valueOf(b).compareTo(valueOf(a));
+      if (cmp != 0) return cmp;
+      return a.rider.name.compareTo(b.rider.name);
+    });
+    return list;
+  }
+
+  String companionMetricLabel(CompanionStats stats, CompanionRankMetric metric) {
+    return switch (metric) {
+      CompanionRankMetric.sharedKm => '${stats.sharedKm.round()} km',
+      CompanionRankMetric.sharedElevation => '${stats.sharedElevationM} m',
+      CompanionRankMetric.sharedRides => '${stats.sharedRides} rides',
+      CompanionRankMetric.longestRide => '${stats.longestRideKm.round()} km',
+      CompanionRankMetric.biggestClimb => '${stats.biggestClimbM} m',
+      CompanionRankMetric.earlyBird => '${stats.morningRides} early starts',
+      CompanionRankMetric.weekendWarrior => '${stats.weekendRides} weekends',
+      CompanionRankMetric.climbDuo => '${stats.hardRides} hard days',
+    };
+  }
+
+  /// Shared past rides with a companion (for rider profile).
+  List<Ride> sharedPastRidesWith(String riderId) => _sharedPastRidesWith(riderId);
 }

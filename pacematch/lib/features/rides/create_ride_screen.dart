@@ -255,6 +255,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
           MeetingPointField(
             controller: _meeting,
             biasNear: _plannedRoute?.start ?? _meetingPoint,
+            readOnly: _hasPlannedRoute,
             onPlaceSelected: (place) {
               setState(() => _meetingPoint = place.point);
             },

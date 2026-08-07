@@ -13,12 +13,15 @@ class MeetingPointField extends StatefulWidget {
     this.biasNear,
     this.onPlaceSelected,
     this.enabled = true,
+    /// When true (route planned): fixed start label, no address suggestions.
+    this.readOnly = false,
   });
 
   final TextEditingController controller;
   final LatLng? biasNear;
   final ValueChanged<PlaceSuggestion>? onPlaceSelected;
   final bool enabled;
+  final bool readOnly;
 
   @override
   State<MeetingPointField> createState() => _MeetingPointFieldState();
@@ -48,8 +51,23 @@ class _MeetingPointFieldState extends State<MeetingPointField> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant MeetingPointField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.readOnly && !oldWidget.readOnly) {
+      _debounce?.cancel();
+      _requestId++;
+      if (_suggestions.isNotEmpty || _loading) {
+        setState(() {
+          _suggestions = const [];
+          _loading = false;
+        });
+      }
+    }
+  }
+
   void _onTextChanged() {
-    if (_suppressSearch) return;
+    if (_suppressSearch || widget.readOnly || !widget.enabled) return;
     _debounce?.cancel();
     final q = widget.controller.text.trim();
     if (q.length < 3) {
@@ -65,11 +83,12 @@ class _MeetingPointFieldState extends State<MeetingPointField> {
   }
 
   Future<void> _search(String query) async {
+    if (widget.readOnly || !widget.enabled) return;
     final id = ++_requestId;
     setState(() => _loading = true);
     try {
       final results = await _geocoder.search(query, near: widget.biasNear);
-      if (!mounted || id != _requestId) return;
+      if (!mounted || id != _requestId || widget.readOnly) return;
       setState(() {
         _suggestions = results;
         _loading = false;
@@ -100,6 +119,9 @@ class _MeetingPointFieldState extends State<MeetingPointField> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final locked = widget.readOnly;
+    final showSuggestions =
+        !locked && widget.enabled && _suggestions.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -108,12 +130,16 @@ class _MeetingPointFieldState extends State<MeetingPointField> {
           controller: widget.controller,
           focusNode: _focus,
           enabled: widget.enabled,
+          readOnly: locked,
+          enableInteractiveSelection: !locked,
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             labelText: 'Meeting point',
-            hintText: 'Address or place name',
-            helperText: 'Type an address for suggestions, or edit freely',
-            suffixIcon: _loading
+            hintText: locked ? null : 'Address or place name',
+            helperText: locked
+                ? 'Locked from route start'
+                : 'Type an address for suggestions, or edit freely',
+            suffixIcon: (!locked && _loading)
                 ? const Padding(
                     padding: EdgeInsets.all(12),
                     child: SizedBox(
@@ -122,10 +148,10 @@ class _MeetingPointFieldState extends State<MeetingPointField> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                : const Icon(Icons.place_outlined),
+                : Icon(locked ? Icons.lock_outline : Icons.place_outlined),
           ),
         ),
-        if (_suggestions.isNotEmpty) ...[
+        if (showSuggestions) ...[
           const SizedBox(height: 4),
           Material(
             elevation: 2,

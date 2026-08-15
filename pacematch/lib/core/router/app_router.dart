@@ -5,6 +5,7 @@ import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/calendar/calendar_screen.dart';
 import '../../features/groups/create_group_screen.dart';
+import '../../features/groups/group_chat_screen.dart';
 import '../../features/groups/group_detail_screen.dart';
 import '../../features/groups/groups_screen.dart';
 import '../../features/home/home_screen.dart';
@@ -121,6 +122,14 @@ class AppRouter {
                       builder: (context, state) => GroupDetailScreen(
                         groupId: state.pathParameters['id']!,
                       ),
+                      routes: [
+                        GoRoute(
+                          path: 'chat',
+                          builder: (context, state) => GroupChatScreen(
+                            groupId: state.pathParameters['id']!,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

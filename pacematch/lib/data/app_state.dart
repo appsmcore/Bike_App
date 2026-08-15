@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'fake_data.dart';
 import 'models.dart';
+import 'route_models.dart';
 
 class AppState extends ChangeNotifier {
   bool isAuthenticated = false;
@@ -30,6 +31,9 @@ class AppState extends ChangeNotifier {
   late final List<RiderProfile> _riders = createDemoRiders();
   late final Map<String, List<String>> _rideParticipantIds =
       createDemoRideParticipants();
+  late final List<RidePhoto> _ridePhotos = createDemoRidePhotos();
+  late final List<GroupMessage> _groupMessages = createDemoGroupMessages();
+  final List<SavedRoute> _savedRoutes = [];
 
   // Onboarding draft
   final Set<BikeType> draftBikes = {BikeType.road};
@@ -47,6 +51,41 @@ class AppState extends ChangeNotifier {
   List<Ride> get rides => List.unmodifiable(_rides);
   List<CyclingGroup> get groups => List.unmodifiable(_groups);
   List<RiderProfile> get riders => List.unmodifiable(_riders);
+  List<SavedRoute> get savedRoutes => List.unmodifiable(_savedRoutes);
+
+  /// Persist a planned route for later inspiration (not shown on home map).
+  SavedRoute savePlannedRoute(
+    PlannedRoute route, {
+    String? name,
+  }) {
+    final stamp = DateTime.now();
+    final label = (name == null || name.trim().isEmpty)
+        ? '${route.bikeType.label} · ${route.distanceKm.toStringAsFixed(1)} km'
+        : name.trim();
+    final saved = SavedRoute(
+      id: 'route-${stamp.millisecondsSinceEpoch}',
+      name: label,
+      createdAt: stamp,
+      route: route,
+      createdByUserId: currentUserId,
+    );
+    _savedRoutes.insert(0, saved);
+    notifyListeners();
+    return saved;
+  }
+
+  void deleteSavedRoute(String id) {
+    _savedRoutes.removeWhere((r) => r.id == id);
+    notifyListeners();
+  }
+
+  SavedRoute? savedRouteById(String id) {
+    try {
+      return _savedRoutes.firstWhere((r) => r.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Your groups first, then others — by start time within each bucket.
   /// Past rides are kept out of the home finder.
@@ -360,6 +399,91 @@ class AppState extends ChangeNotifier {
         ? profile.copyWith(clearBikePhoto: true)
         : profile.copyWith(bikePhotoBytes: bytes);
     notifyListeners();
+  }
+
+  List<RidePhoto> get ridePhotos => List.unmodifiable(_ridePhotos);
+
+  List<RidePhoto> photosForRide(String rideId) {
+    final list =
+        _ridePhotos.where((p) => p.rideId == rideId).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  List<RidePhoto> photosForUser(String userId) {
+    final list =
+        _ridePhotos.where((p) => p.uploaderId == userId).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  /// Whether the current user can attach memories to this ride.
+  bool canAddPhotosToRide(String rideId) {
+    final ride = rideById(rideId);
+    if (ride == null || !ride.isPast) return false;
+    return hasJoinedRsvp(rideId) || isOrganizerOf(rideId);
+  }
+
+  void addRidePhotos({
+    required String rideId,
+    required List<Uint8List> images,
+    String? caption,
+  }) {
+    if (images.isEmpty || !canAddPhotosToRide(rideId)) return;
+    final now = DateTime.now();
+    for (var i = 0; i < images.length; i++) {
+      _ridePhotos.insert(
+        0,
+        RidePhoto(
+          id: 'photo-${now.millisecondsSinceEpoch}-$i',
+          rideId: rideId,
+          uploaderId: currentUserId,
+          createdAt: now.add(Duration(milliseconds: i)),
+          caption: i == 0 ? caption : null,
+          bytes: images[i],
+        ),
+      );
+    }
+    notifyListeners();
+  }
+
+  void removeRidePhoto(String photoId) {
+    _ridePhotos.removeWhere(
+      (p) => p.id == photoId && p.uploaderId == currentUserId,
+    );
+    notifyListeners();
+  }
+
+  /// Chronological messages for a group chat (oldest first).
+  List<GroupMessage> messagesForGroup(String groupId) {
+    final list =
+        _groupMessages.where((m) => m.groupId == groupId).toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return list;
+  }
+
+  GroupMessage? latestMessageForGroup(String groupId) {
+    final messages = messagesForGroup(groupId);
+    if (messages.isEmpty) return null;
+    return messages.last;
+  }
+
+  /// Members can post to the group thread.
+  GroupMessage? sendGroupMessage(String groupId, String body) {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty || !isMemberOf(groupId) || groupById(groupId) == null) {
+      return null;
+    }
+    final message = GroupMessage(
+      id: 'msg-${DateTime.now().millisecondsSinceEpoch}',
+      groupId: groupId,
+      senderId: currentUserId,
+      body: trimmed,
+      createdAt: DateTime.now(),
+    );
+    _groupMessages.add(message);
+    notifyListeners();
+    return message;
   }
 
   List<Ride> filteredRides({

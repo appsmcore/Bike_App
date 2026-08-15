@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
+import '../../shared/widgets/ride_memories.dart';
 import '../../shared/widgets/rider_widgets.dart';
 
 class RiderProfileScreen extends StatelessWidget {
@@ -31,6 +32,7 @@ class RiderProfileScreen extends StatelessWidget {
         shared.fold<double>(0, (sum, r) => sum + r.distanceKm);
     final sharedElev =
         shared.fold<int>(0, (sum, r) => sum + r.elevationM);
+    final memories = state.photosForUser(riderId);
 
     return Scaffold(
       body: CustomScrollView(
@@ -68,7 +70,7 @@ class RiderProfileScreen extends StatelessWidget {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -109,6 +111,68 @@ class RiderProfileScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 24),
+                  Text(
+                    isYou ? 'Your ride memories' : 'Ride memories',
+                    style: theme.textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    memories.isEmpty
+                        ? (isYou
+                            ? 'Add photos after rides to build your feed.'
+                            : 'No memories shared yet.')
+                        : '${memories.length} shot${memories.length == 1 ? '' : 's'} from the road',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+          if (memories.isEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: RideMemoriesGrid(
+                  photos: memories,
+                  emptyTitle: isYou ? 'No memories yet' : 'Gallery empty',
+                  emptySubtitle: isYou
+                      ? 'Open a past ride and tap Add photos.'
+                      : 'This rider hasn’t posted ride photos yet.',
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 2,
+                  mainAxisSpacing: 2,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final photo = memories[index];
+                    return RideMemoryThumb(
+                      photo: photo,
+                      onTap: () => openRideMemoryViewer(
+                        context,
+                        photos: memories,
+                        initialIndex: index,
+                      ),
+                    );
+                  },
+                  childCount: memories.length,
+                ),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text('Stats', style: theme.textTheme.titleLarge),
                   const SizedBox(height: 12),
                   Row(

@@ -49,6 +49,29 @@ class PlannedRoute {
   }
 }
 
+/// A planned route kept for inspiration when offering a new ride.
+/// Never shown on the home map — only in the saved-routes library.
+class SavedRoute {
+  const SavedRoute({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    required this.route,
+    this.createdByUserId,
+  });
+
+  final String id;
+  final String name;
+  final DateTime createdAt;
+  final PlannedRoute route;
+  final String? createdByUserId;
+
+  String get subtitle =>
+      '${route.bikeType.label} · ${route.distanceKm.toStringAsFixed(1)} km · '
+      '${route.elevationM} m';
+}
+
+
 /// Surface preference encoded for scoring ORS alternatives.
 enum SurfacePreference {
   /// Cycleways first, quiet paved roads second, unpaved only if needed.

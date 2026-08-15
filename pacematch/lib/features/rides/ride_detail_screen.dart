@@ -8,6 +8,7 @@ import '../../data/app_state.dart';
 import '../../data/models.dart';
 import '../../shared/widgets/elevation_profile_chart.dart';
 import '../../shared/widgets/ride_card.dart';
+import '../../shared/widgets/ride_memories.dart';
 import '../../shared/widgets/rider_widgets.dart';
 import '../../shared/widgets/rides_map_view.dart';
 
@@ -135,6 +136,8 @@ class RideDetailScreen extends StatelessWidget {
                     distanceKm: ride.distanceKm,
                   ),
                   const SizedBox(height: 28),
+                  _RideMemoriesSection(ride: ride),
+                  const SizedBox(height: 28),
                   Text('Your RSVP', style: theme.textTheme.titleLarge),
                   const SizedBox(height: 12),
                   RsvpButtonRow(
@@ -155,6 +158,75 @@ class RideDetailScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RideMemoriesSection extends StatelessWidget {
+  const _RideMemoriesSection({required this.ride});
+
+  final Ride ride;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final theme = Theme.of(context);
+    final photos = state.photosForRide(ride.id);
+    final canAdd = state.canAddPhotosToRide(ride.id);
+
+    if (!ride.isPast && photos.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text('Ride memories', style: theme.textTheme.titleLarge),
+            ),
+            if (photos.isNotEmpty)
+              Text(
+                '${photos.length}',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: AppColors.forest,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          canAdd
+              ? 'Share a snapshot from the day — it lands on your profile feed.'
+              : photos.isEmpty
+                  ? 'Memories appear here after the ride.'
+                  : 'Tap a photo to open the gallery.',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        if (canAdd || photos.isNotEmpty)
+          RideMemoriesStrip(
+            photos: photos,
+            onAddTap: canAdd
+                ? () => showAddRidePhotosSheet(context, rideId: ride.id)
+                : null,
+          )
+        else
+          Text(
+            'No photos for this ride yet.',
+            style: theme.textTheme.bodyMedium,
+          ),
+        if (canAdd) ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: () => showAddRidePhotosSheet(context, rideId: ride.id),
+            icon: const Icon(Icons.add_a_photo_outlined),
+            label: Text(photos.isEmpty ? 'Add photos' : 'Add more photos'),
+          ),
+        ],
+      ],
     );
   }
 }

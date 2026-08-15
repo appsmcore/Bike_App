@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../services/elevation_math.dart';
 
 /// Elevation profile with axis labels, climb summary, and a smooth curve.
 class ElevationProfileChart extends StatelessWidget {
@@ -21,8 +22,10 @@ class ElevationProfileChart extends StatelessWidget {
     final hasData = points.length >= 2;
     final minV = hasData ? points.reduce((a, b) => a < b ? a : b) : 0.0;
     final maxV = hasData ? points.reduce((a, b) => a > b ? a : b) : 0.0;
-    final climb = climbM ??
-        (hasData ? (maxV - minV).round().clamp(0, 99999) : 0);
+    // Always derive climb from the drawn series so the chip matches the curve.
+    final climb = hasData
+        ? ElevationMath.climbFromProfile(points)
+        : (climbM ?? 0);
 
     return Container(
       width: double.infinity,

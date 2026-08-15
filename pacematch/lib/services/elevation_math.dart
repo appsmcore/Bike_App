@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
-/// Shared elevation helpers — filters DEM/GPS noise that otherwise inflates climb.
+/// Shared elevation helpers — climb is derived from the same samples as the chart.
 abstract final class ElevationMath {
   /// Moving-average smooth (window odd, >= 3).
   static List<double> smooth(List<double> raw, {int window = 5}) {
-    if (raw.length < 3) return List<double>.from(raw);
+    if (raw.length < 3 || window <= 1) return List<double>.from(raw);
     final w = window.isOdd ? window : window + 1;
     final half = w ~/ 2;
     final out = <double>[];
@@ -21,11 +21,13 @@ abstract final class ElevationMath {
     return out;
   }
 
-  /// Cumulative ascent in meters after smoothing.
-  /// Ignores tiny ups (DEM noise) below [minStepM].
+  /// Cumulative ascent in meters (sum of ups along the profile).
+  ///
+  /// After smoothing, use a small [minStepM] so gradual climbs still count;
+  /// a large threshold (e.g. 4 m per sample) under-reports real routes.
   static int ascentMeters(
     List<double> elevations, {
-    double minStepM = 4,
+    double minStepM = 1,
     int smoothWindow = 5,
   }) {
     if (elevations.length < 2) return 0;
@@ -38,40 +40,31 @@ abstract final class ElevationMath {
     return gain.round();
   }
 
-  /// Reject absurd climb numbers (e.g. 34000 m from noisy samples).
+  /// Cap absurd values; when a profile exists it is the source of truth so the
+  /// Climb number matches the elevation chart.
   static int sanitizeAscent({
     required int ascentM,
     required double distanceKm,
     List<double>? elevations,
   }) {
-    if (ascentM <= 0) {
-      if (elevations != null && elevations.length >= 2) {
-        return sanitizeAscent(
-          ascentM: ascentMeters(elevations),
-          distanceKm: distanceKm,
-        );
-      }
-      return 0;
-    }
+    final fromProfile = (elevations != null && elevations.length >= 2)
+        ? ascentMeters(elevations)
+        : 0;
 
-    // Hard physical-ish caps for bike routes.
+    // Prefer profile-derived climb whenever we can draw a chart from it.
+    final chosen = fromProfile > 0
+        ? fromProfile
+        : (ascentM > 0 ? ascentM : 0);
+
+    return _capByDistance(chosen, distanceKm);
+  }
+
+  static int _capByDistance(int ascentM, double distanceKm) {
+    if (ascentM <= 0) return 0;
     final byDistance = distanceKm <= 0
         ? 6000
-        : (distanceKm * 180).round().clamp(200, 8000); // ~18% avg grade max
-    final capped = math.min(ascentM, byDistance);
-
-    // If API value looks insane vs recomputed profile, prefer recomputed.
-    if (elevations != null && elevations.length >= 2) {
-      final recomputed = ascentMeters(elevations);
-      if (ascentM > 5000 || ascentM > recomputed * 3 + 200) {
-        return sanitizeAscent(
-          ascentM: recomputed,
-          distanceKm: distanceKm,
-        );
-      }
-    }
-
-    return capped;
+        : (distanceKm * 180).round().clamp(200, 8000);
+    return math.min(ascentM, byDistance);
   }
 
   static List<double> profilePoints(List<double> elevations, {int max = 48}) {
@@ -85,5 +78,11 @@ abstract final class ElevationMath {
       out.add(s[idx]);
     }
     return out;
+  }
+
+  /// Climb for an already-smoothed / downsampled chart series.
+  static int climbFromProfile(List<double> profile) {
+    if (profile.length < 2) return 0;
+    return ascentMeters(profile, minStepM: 0.5, smoothWindow: 1);
   }
 }

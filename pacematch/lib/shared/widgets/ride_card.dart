@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models.dart';
+import 'rides_map_view.dart';
 
 class RideCard extends StatelessWidget {
   const RideCard({
@@ -26,51 +27,75 @@ class RideCard extends StatelessWidget {
     return Material(
       color: theme.cardTheme.color,
       borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
-        borderRadius: BorderRadius.circular(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
+            SizedBox(
               height: 168,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: ride.coverGradient,
-                ),
-              ),
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Row(
-                    children: [
-                      _Pill(text: ride.bikeType.label),
-                      const SizedBox(width: 8),
-                      _Pill(text: '${ride.difficulty.emoji} ${ride.difficulty.label}'),
-                      const Spacer(),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white.withValues(alpha: 0.85),
+                  RideCardMapCover(ride: ride, height: 168),
+                  // Readable text over map tiles
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.15),
+                          Colors.black.withValues(alpha: 0.55),
+                          (ride.coverGradient.last).withValues(alpha: 0.88),
+                        ],
+                        stops: const [0.0, 0.45, 1.0],
                       ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Text(
-                    ride.title,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    dateLabel,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.85),
+                  Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            _Pill(text: ride.bikeType.label),
+                            const SizedBox(width: 8),
+                            _Pill(
+                              text:
+                                  '${ride.difficulty.emoji} ${ride.difficulty.label}',
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        Text(
+                          ride.title,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            shadows: const [
+                              Shadow(
+                                color: Color(0x66000000),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          dateLabel,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -91,8 +116,14 @@ class RideCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      _Stat(icon: Icons.route, label: '${ride.distanceKm.toInt()} km'),
-                      _Stat(icon: Icons.terrain, label: '${ride.elevationM} m'),
+                      _Stat(
+                        icon: Icons.route,
+                        label: '${ride.distanceKm.toInt()} km',
+                      ),
+                      _Stat(
+                        icon: Icons.terrain,
+                        label: '${ride.elevationM} m',
+                      ),
                       _Stat(
                         icon: Icons.groups,
                         label: '${ride.participants}/${ride.riderLimit}',
@@ -153,7 +184,9 @@ class RsvpButtonRow extends StatelessWidget {
             selected: current == RsvpStatus.declined,
             color: const Color(0xFF8B4B4B),
             onTap: () => onChanged(
-              current == RsvpStatus.declined ? RsvpStatus.none : RsvpStatus.declined,
+              current == RsvpStatus.declined
+                  ? RsvpStatus.none
+                  : RsvpStatus.declined,
             ),
           ),
         ),

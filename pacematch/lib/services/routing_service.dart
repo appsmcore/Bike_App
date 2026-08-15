@@ -127,14 +127,23 @@ class RoutingService {
     required int preferredAscentM,
   }) {
     final profile = ElevationMath.profilePoints(rawElevations, max: 48);
-    final ascent = ElevationMath.sanitizeAscent(
-      ascentM: preferredAscentM,
-      distanceKm: route.distanceKm,
-      elevations: rawElevations.isNotEmpty ? rawElevations : profile,
-    );
+    final display =
+        profile.isNotEmpty ? profile : route.elevationProfile;
+    // Climb must match the chart series, not a separate API ascend value.
+    final ascent = display.length >= 2
+        ? ElevationMath.sanitizeAscent(
+            ascentM: ElevationMath.climbFromProfile(display),
+            distanceKm: route.distanceKm,
+            elevations: display,
+          )
+        : ElevationMath.sanitizeAscent(
+            ascentM: preferredAscentM,
+            distanceKm: route.distanceKm,
+            elevations: rawElevations,
+          );
     return route.copyWith(
       elevationM: ascent,
-      elevationProfile: profile.isNotEmpty ? profile : route.elevationProfile,
+      elevationProfile: display,
     );
   }
 
@@ -233,9 +242,11 @@ class RoutingService {
     final distanceKm = double.parse((distanceM / 1000).toStringAsFixed(1));
     final profilePoints = ElevationMath.profilePoints(elevations, max: 48);
     final ascentM = ElevationMath.sanitizeAscent(
-      ascentM: ascent.round(),
+      ascentM: profilePoints.length >= 2
+          ? ElevationMath.climbFromProfile(profilePoints)
+          : ascent.round(),
       distanceKm: distanceKm,
-      elevations: elevations,
+      elevations: profilePoints.isNotEmpty ? profilePoints : elevations,
     );
 
     final label = useCustomModel
@@ -519,9 +530,11 @@ class RoutingService {
 
     final profilePoints = ElevationMath.profilePoints(elevations, max: 48);
     final ascentM = ElevationMath.sanitizeAscent(
-      ascentM: rawAscent.round(),
+      ascentM: profilePoints.length >= 2
+          ? ElevationMath.climbFromProfile(profilePoints)
+          : rawAscent.round(),
       distanceKm: distanceKm,
-      elevations: elevations,
+      elevations: profilePoints.isNotEmpty ? profilePoints : elevations,
     );
 
     return PlannedRoute(

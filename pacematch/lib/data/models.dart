@@ -141,6 +141,50 @@ class Ride {
   bool get isPast => startsAt.isBefore(DateTime.now());
 }
 
+/// A photo memory attached to a completed ride.
+class RidePhoto {
+  RidePhoto({
+    required this.id,
+    required this.rideId,
+    required this.uploaderId,
+    required this.createdAt,
+    this.caption,
+    this.bytes,
+    this.moodGradient,
+  });
+
+  final String id;
+  final String rideId;
+  final String uploaderId;
+  final DateTime createdAt;
+  final String? caption;
+
+  /// User-picked image bytes (in-memory for the mock app).
+  final Uint8List? bytes;
+
+  /// Branded gradient used for seeded demo memories without real photos.
+  final List<Color>? moodGradient;
+
+  bool get hasBytes => bytes != null && bytes!.isNotEmpty;
+}
+
+/// A chat message in a cycling group thread.
+class GroupMessage {
+  GroupMessage({
+    required this.id,
+    required this.groupId,
+    required this.senderId,
+    required this.body,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String groupId;
+  final String senderId;
+  final String body;
+  final DateTime createdAt;
+}
+
 /// Public rider card used for co-riders and profile peeks.
 class RiderProfile {
   const RiderProfile({

@@ -3,22 +3,27 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/config/routing_config.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/app_state.dart';
 import '../../data/models.dart';
 import '../../data/route_models.dart';
 import '../../services/routing_service.dart';
+import 'saved_routes_screen.dart';
 
 class RoutePlannerScreen extends StatefulWidget {
   const RoutePlannerScreen({
     super.key,
     this.initialBikeType = BikeType.road,
     this.initialWaypoints = const [],
+    this.initialRoute,
   });
 
   final BikeType initialBikeType;
   final List<LatLng> initialWaypoints;
+  final PlannedRoute? initialRoute;
 
   @override
   State<RoutePlannerScreen> createState() => _RoutePlannerScreenState();
@@ -44,13 +49,20 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   void initState() {
     super.initState();
     _bikeType = widget.initialBikeType;
-    _waypoints.addAll(widget.initialWaypoints);
+    final seed = widget.initialRoute;
+    if (seed != null) {
+      _applyPlannedRoute(seed, fitCamera: false);
+    } else {
+      _waypoints.addAll(widget.initialWaypoints);
+    }
     if (!RoutingConfig.hasAnyRoutingKey) {
       _error =
           'Missing API keys. Add GH_API_KEY / ORS_API_KEY to pacematch/.env '
           '(same file as the route playground), then restart the app.';
-    } else if (_waypoints.length >= 2) {
+    } else if (_route == null && _waypoints.length >= 2) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _requestRoute());
+    } else if (_route != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitToGeometry());
     }
   }
 
@@ -60,6 +72,64 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     _routing.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  void _applyPlannedRoute(PlannedRoute route, {bool fitCamera = true}) {
+    _debounce?.cancel();
+    _routeRequestId++;
+    _waypoints
+      ..clear()
+      ..addAll(route.waypoints);
+    _geometry = List<LatLng>.from(route.geometry);
+    _route = route;
+    _bikeType = route.bikeType;
+    _flexible = route.flexibleRouting;
+    _error = null;
+    _routingBusy = false;
+    _elevationBusy = false;
+    _rerouteQueued = false;
+    if (fitCamera) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitToGeometry());
+    }
+  }
+
+  void _fitToGeometry() {
+    final pts = _geometry.isNotEmpty ? _geometry : _waypoints;
+    if (pts.isEmpty || !mounted) return;
+    if (pts.length == 1) {
+      _mapController.move(pts.first, 12);
+      return;
+    }
+    var minLat = pts.first.latitude;
+    var maxLat = pts.first.latitude;
+    var minLng = pts.first.longitude;
+    var maxLng = pts.first.longitude;
+    for (final p in pts) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds(
+          LatLng(minLat, minLng),
+          LatLng(maxLat, maxLng),
+        ),
+        padding: const EdgeInsets.all(48),
+      ),
+    );
+  }
+
+  Future<void> _openSavedRoutes() async {
+    final selected = await Navigator.of(context).push<PlannedRoute>(
+      MaterialPageRoute(builder: (_) => const SavedRoutesScreen()),
+    );
+    if (!mounted || selected == null) return;
+    setState(() => _applyPlannedRoute(selected));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Saved route loaded — adjust or confirm')),
+    );
   }
 
   void _onMapTap(TapPosition _, LatLng point) {
@@ -138,7 +208,6 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         _elevationBusy = true;
       });
 
-      // Elevation in background — must not block the map.
       unawaited(_enrichElevation(requestId, result));
     } catch (e) {
       if (!mounted || requestId != _routeRequestId) return;
@@ -192,12 +261,15 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       );
       return;
     }
+    // Keep for inspiration library — never shown on the home map.
+    context.read<AppState>().savePlannedRoute(route);
     Navigator.of(context).pop(route);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final savedCount = context.watch<AppState>().savedRoutes.length;
     final center = _waypoints.isNotEmpty
         ? _waypoints.last
         : const LatLng(46.4983, 11.3548);
@@ -206,11 +278,16 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       appBar: AppBar(
         title: const Text('Plan route'),
         actions: [
+          TextButton.icon(
+            onPressed: _openSavedRoutes,
+            icon: const Icon(Icons.bookmarks_outlined, size: 18),
+            label: Text(savedCount == 0 ? 'Saved' : 'Saved ($savedCount)'),
+          ),
           TextButton(
             onPressed: _waypoints.isEmpty ? null : _clearAll,
             child: const Text('Clear'),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -319,7 +396,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                               SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                               SizedBox(width: 10),
                               Text('Calculating route…'),

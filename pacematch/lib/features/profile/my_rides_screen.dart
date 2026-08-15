@@ -45,7 +45,11 @@ class MyRidesScreen extends StatelessWidget {
                       elevationM: state.lifetimeJoinedElevationM,
                       rideCount: completed.length,
                     ),
-              badgeFor: (ride) => DateFormat('MMM d').format(ride.startsAt),
+              badgeFor: (ride) {
+                final n = state.photosForRide(ride.id).length;
+                final date = DateFormat('MMM d').format(ride.startsAt);
+                return n == 0 ? date : '$date · $n photos';
+              },
             ),
             _RideListTab(
               rides: offered,

@@ -20,6 +20,20 @@ DateTime _daysAgo(int days, {int hour = 8}) {
   return DateTime(then.year, then.month, then.day, hour, 0);
 }
 
+/// Demo route as flat [lat, lng, ...] around a start — for list map covers.
+List<double> _demoRoute(
+  double lat,
+  double lng, {
+  required List<(double dLat, double dLng)> deltas,
+}) {
+  final out = <double>[lat, lng];
+  for (final d in deltas) {
+    out.add(lat + d.$1);
+    out.add(lng + d.$2);
+  }
+  return out;
+}
+
 const currentUserId = 'user-alex';
 
 const demoProfile = UserProfile(
@@ -201,6 +215,15 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [200, 320, 480, 900, 1100, 850, 600, 350, 220],
         startLat: 46.4983,
         startLng: 11.3548,
+        routeLatLngs: _demoRoute(46.4983, 11.3548, deltas: [
+          (0.04, 0.08),
+          (0.10, 0.14),
+          (0.16, 0.10),
+          (0.18, 0.02),
+          (0.12, -0.06),
+          (0.04, -0.04),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-mtb-1',
@@ -223,6 +246,15 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [400, 700, 950, 1200, 800, 1100, 600, 450],
         startLat: 46.4135,
         startLng: 11.2412,
+        routeLatLngs: _demoRoute(46.4135, 11.2412, deltas: [
+          (0.02, -0.03),
+          (0.06, -0.05),
+          (0.09, -0.01),
+          (0.07, 0.04),
+          (0.03, 0.05),
+          (0.0, 0.02),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-gravel-1',
@@ -245,6 +277,15 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [180, 240, 360, 520, 480, 390, 300, 210],
         startLat: 46.6713,
         startLng: 11.1595,
+        routeLatLngs: _demoRoute(46.6713, 11.1595, deltas: [
+          (-0.03, 0.06),
+          (-0.08, 0.12),
+          (-0.12, 0.18),
+          (-0.10, 0.24),
+          (-0.04, 0.20),
+          (0.02, 0.10),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-easy-1',
@@ -266,6 +307,14 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [150, 160, 180, 200, 190, 170, 155],
         startLat: 46.4981,
         startLng: 11.3547,
+        routeLatLngs: _demoRoute(46.4981, 11.3547, deltas: [
+          (0.02, 0.03),
+          (0.04, 0.05),
+          (0.05, 0.02),
+          (0.03, -0.01),
+          (0.01, -0.02),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-expert-1',
@@ -288,6 +337,15 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [500, 900, 1400, 1800, 1200, 2000, 1600, 900, 600],
         startLat: 46.4769,
         startLng: 11.7702,
+        routeLatLngs: _demoRoute(46.4769, 11.7702, deltas: [
+          (0.05, 0.04),
+          (0.10, 0.08),
+          (0.14, 0.02),
+          (0.12, -0.06),
+          (0.06, -0.10),
+          (0.02, -0.04),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-ebike-1',
@@ -309,6 +367,14 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [900, 1000, 1150, 1300, 1250, 1100, 980],
         startLat: 46.5422,
         startLng: 11.5317,
+        routeLatLngs: _demoRoute(46.5422, 11.5317, deltas: [
+          (0.03, 0.05),
+          (0.06, 0.08),
+          (0.08, 0.04),
+          (0.05, -0.02),
+          (0.02, -0.03),
+          (0.0, 0.0),
+        ]),
       ),
       // Past rides (joined history)
       Ride(
@@ -331,6 +397,13 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [200, 350, 520, 700, 640, 400, 250],
         startLat: 46.4983,
         startLng: 11.3548,
+        routeLatLngs: _demoRoute(46.4983, 11.3548, deltas: [
+          (0.05, 0.06),
+          (0.09, 0.10),
+          (0.08, 0.16),
+          (0.03, 0.12),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-past-2',
@@ -352,6 +425,13 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [600, 1100, 1600, 2100, 1800, 1400, 700],
         startLat: 46.4769,
         startLng: 11.7702,
+        routeLatLngs: _demoRoute(46.4769, 11.7702, deltas: [
+          (0.06, 0.05),
+          (0.11, 0.09),
+          (0.13, 0.01),
+          (0.07, -0.07),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-past-3',
@@ -373,6 +453,13 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [500, 700, 900, 750, 600, 520],
         startLat: 46.5280,
         startLng: 11.4050,
+        routeLatLngs: _demoRoute(46.5280, 11.4050, deltas: [
+          (0.03, -0.02),
+          (0.06, 0.01),
+          (0.04, 0.05),
+          (0.01, 0.03),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-past-4',
@@ -394,6 +481,13 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [200, 320, 480, 560, 420, 280],
         startLat: 46.4135,
         startLng: 11.2412,
+        routeLatLngs: _demoRoute(46.4135, 11.2412, deltas: [
+          (-0.02, 0.04),
+          (-0.05, 0.08),
+          (-0.03, 0.12),
+          (0.01, 0.08),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-past-5',
@@ -415,6 +509,13 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [400, 700, 1100, 1400, 1200, 800, 500],
         startLat: 46.6180,
         startLng: 10.5800,
+        routeLatLngs: _demoRoute(46.6180, 10.5800, deltas: [
+          (0.04, 0.07),
+          (0.08, 0.11),
+          (0.10, 0.05),
+          (0.05, -0.02),
+          (0.0, 0.0),
+        ]),
       ),
       // Offered by current user
       Ride(
@@ -437,6 +538,12 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [160, 200, 260, 300, 240, 180],
         startLat: 46.4981,
         startLng: 11.3547,
+        routeLatLngs: _demoRoute(46.4981, 11.3547, deltas: [
+          (0.03, 0.04),
+          (0.05, 0.07),
+          (0.04, 0.02),
+          (0.0, 0.0),
+        ]),
       ),
       Ride(
         id: 'ride-offered-2',
@@ -458,6 +565,12 @@ List<Ride> createDemoRides() => [
         elevationProfile: const [180, 250, 320, 380, 300, 220],
         startLat: 46.6713,
         startLng: 11.1595,
+        routeLatLngs: _demoRoute(46.6713, 11.1595, deltas: [
+          (-0.02, 0.05),
+          (-0.05, 0.09),
+          (-0.03, 0.12),
+          (0.0, 0.0),
+        ]),
       ),
     ];
 
@@ -502,5 +615,155 @@ List<CyclingGroup> createDemoGroups() => [
         location: 'Merano',
         upcomingRideIds: ['ride-gravel-1'],
         coverGradient: const [Color(0xFF6B8F71), Color(0xFF2E4534)],
+      ),
+    ];
+
+/// Seeded group chat threads so joined groups feel alive.
+List<GroupMessage> createDemoGroupMessages() => [
+      GroupMessage(
+        id: 'msg-g1-1',
+        groupId: 'g1',
+        senderId: 'user-sara',
+        body: 'Anyone keen for an early start on the Dolomites loop?',
+        createdAt: _daysAgo(1, hour: 18),
+      ),
+      GroupMessage(
+        id: 'msg-g1-2',
+        groupId: 'g1',
+        senderId: 'user-giulia',
+        body: 'I’m in — coffee stop at Castelrotto?',
+        createdAt: _daysAgo(1, hour: 18).add(const Duration(minutes: 12)),
+      ),
+      GroupMessage(
+        id: 'msg-g1-3',
+        groupId: 'g1',
+        senderId: currentUserId,
+        body: 'Count me in. Easy spin pace for the first climb?',
+        createdAt: _daysAgo(1, hour: 19),
+      ),
+      GroupMessage(
+        id: 'msg-g1-4',
+        groupId: 'g1',
+        senderId: 'user-marco',
+        body: 'Perfect. I’ll bring spare tubes for the group.',
+        createdAt: _daysAgo(1, hour: 19).add(const Duration(minutes: 20)),
+      ),
+      GroupMessage(
+        id: 'msg-g1-5',
+        groupId: 'g1',
+        senderId: 'user-elena',
+        body: 'Weather looks clear. See you at the fountain at 8:00 🚲',
+        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+      ),
+      GroupMessage(
+        id: 'msg-g3-1',
+        groupId: 'g3',
+        senderId: 'user-lukas',
+        body: 'Trail conditions after yesterday’s rain — sticky on the lower section.',
+        createdAt: _daysAgo(2, hour: 16),
+      ),
+      GroupMessage(
+        id: 'msg-g3-2',
+        groupId: 'g3',
+        senderId: 'user-nina',
+        body: 'Thanks! I’ll stick to the meadow loop then.',
+        createdAt: _daysAgo(2, hour: 16).add(const Duration(minutes: 25)),
+      ),
+      GroupMessage(
+        id: 'msg-g3-3',
+        groupId: 'g3',
+        senderId: 'user-tom',
+        body: 'Pizza after the evening ride still on?',
+        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+      ),
+      GroupMessage(
+        id: 'msg-g3-4',
+        groupId: 'g3',
+        senderId: currentUserId,
+        body: 'Always. I’ll grab a table for 7.',
+        createdAt: DateTime.now().subtract(const Duration(hours: 4, minutes: 40)),
+      ),
+      GroupMessage(
+        id: 'msg-g4-1',
+        groupId: 'g4',
+        senderId: 'user-giulia',
+        body: 'New gravel route through the vineyards is mapped — join next weekend?',
+        createdAt: _daysAgo(3, hour: 12),
+      ),
+    ];
+
+/// Seeded ride memories so profiles already feel Instagram-alive.
+List<RidePhoto> createDemoRidePhotos() => [
+      RidePhoto(
+        id: 'photo-1',
+        rideId: 'ride-past-1',
+        uploaderId: currentUserId,
+        createdAt: _daysAgo(12, hour: 11),
+        caption: 'Espresso earned.',
+        moodGradient: const [Color(0xFF1A7A4C), Color(0xFF6B8F71)],
+      ),
+      RidePhoto(
+        id: 'photo-2',
+        rideId: 'ride-past-1',
+        uploaderId: currentUserId,
+        createdAt: _daysAgo(12, hour: 12),
+        caption: 'Peloton vibes on the Kastelruth loop',
+        moodGradient: const [Color(0xFF0F4D32), Color(0xFF3D7A55)],
+      ),
+      RidePhoto(
+        id: 'photo-3',
+        rideId: 'ride-past-2',
+        uploaderId: currentUserId,
+        createdAt: _daysAgo(21, hour: 14),
+        caption: 'Pordoi summit. Legs gone.',
+        moodGradient: const [Color(0xFF244B5A), Color(0xFF5A8FA8)],
+      ),
+      RidePhoto(
+        id: 'photo-4',
+        rideId: 'ride-past-2',
+        uploaderId: 'user-sara',
+        createdAt: _daysAgo(21, hour: 14),
+        caption: 'The crew at the top',
+        moodGradient: const [Color(0xFF1A3340), Color(0xFF4A7A90)],
+      ),
+      RidePhoto(
+        id: 'photo-5',
+        rideId: 'ride-past-3',
+        uploaderId: currentUserId,
+        createdAt: _daysAgo(35, hour: 13),
+        caption: 'Forest dust & grins',
+        moodGradient: const [Color(0xFF3D5A40), Color(0xFF7A9B6E)],
+      ),
+      RidePhoto(
+        id: 'photo-6',
+        rideId: 'ride-past-4',
+        uploaderId: currentUserId,
+        createdAt: _daysAgo(48, hour: 19),
+        caption: 'Golden hour on the wine road',
+        moodGradient: const [Color(0xFF8B6B3D), Color(0xFFC4A35A)],
+      ),
+      RidePhoto(
+        id: 'photo-7',
+        rideId: 'ride-past-4',
+        uploaderId: 'user-giulia',
+        createdAt: _daysAgo(48, hour: 19),
+        caption: 'Vineyards forever',
+        moodGradient: const [Color(0xFF6B8F71), Color(0xFFB8C99A)],
+      ),
+      RidePhoto(
+        id: 'photo-8',
+        rideId: 'ride-past-5',
+        uploaderId: currentUserId,
+        createdAt: _daysAgo(60, hour: 16),
+        caption: 'Stelvio warm-up done',
+        moodGradient: const [Color(0xFF2A4050), Color(0xFF6A8FA0)],
+      ),
+      RidePhoto(
+        id: 'photo-9',
+        rideId: 'ride-past-3',
+        uploaderId: 'user-lukas',
+        createdAt: _daysAgo(35, hour: 14),
+        caption: 'Rooty fun above Bolzano',
+        moodGradient: const [Color(0xFF2A3D28), Color(0xFF5A7A50)],
       ),
     ];

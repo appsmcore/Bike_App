@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/auth_service.dart';
 import 'fake_data.dart';
 import 'models.dart';
 import 'route_models.dart';
@@ -9,7 +12,9 @@ import 'route_models.dart';
 class AppState extends ChangeNotifier {
   bool isAuthenticated = false;
   bool onboardingComplete = false;
+  bool authReady = false;
   ThemeMode themeMode = ThemeMode.system;
+  bool get usesBackendAuth => AuthService.isConfigured;
 
   UserProfile profile = demoProfile;
   final Map<String, RsvpStatus> rsvps = {
@@ -47,6 +52,57 @@ class AppState extends ChangeNotifier {
   };
 
   String get currentUserId => profile.id;
+
+  StreamSubscription<AuthState>? _authSubscription;
+
+  /// Restore Supabase session and listen for sign-in / sign-out.
+  Future<void> initAuth() async {
+    if (!usesBackendAuth) {
+      authReady = true;
+      notifyListeners();
+      return;
+    }
+
+    _applySupabaseUser(AuthService.currentUser);
+    _authSubscription = AuthService.authStateChanges.listen((event) {
+      _applySupabaseUser(event.session?.user);
+    });
+    authReady = true;
+    notifyListeners();
+  }
+
+  void _applySupabaseUser(User? user) {
+    if (user == null) {
+      if (isAuthenticated) {
+        isAuthenticated = false;
+        onboardingComplete = false;
+        profile = demoProfile;
+        rsvps.clear();
+        notifyListeners();
+      }
+      return;
+    }
+
+    final name = (user.userMetadata?['display_name'] as String?)?.trim();
+    profile = demoProfile.copyWith(
+      id: user.id,
+      name: name?.isNotEmpty == true ? name! : _nameFromEmail(user.email),
+      email: user.email ?? profile.email,
+    );
+    isAuthenticated = true;
+    notifyListeners();
+  }
+
+  String _nameFromEmail(String? email) {
+    if (email == null || !email.contains('@')) return 'Rider';
+    return email.split('@').first;
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
 
   List<Ride> get rides => List.unmodifiable(_rides);
   List<CyclingGroup> get groups => List.unmodifiable(_groups);
@@ -207,6 +263,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<AuthResult> loginWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    if (!usesBackendAuth) {
+      login(email: email);
+      return AuthResult.ok();
+    }
+
+    final result = await AuthService.signIn(email: email, password: password);
+    if (result.success) {
+      _applySupabaseUser(AuthService.currentUser);
+    }
+    return result;
+  }
+
   void login({String? email, String? name}) {
     isAuthenticated = true;
     if (email != null || name != null) {
@@ -218,6 +290,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<AuthResult> registerAccount({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    if (!usesBackendAuth) {
+      register(name: name, email: email);
+      return AuthResult.ok();
+    }
+
+    final result = await AuthService.signUp(
+      name: name,
+      email: email,
+      password: password,
+    );
+    if (result.success) {
+      _applySupabaseUser(AuthService.currentUser);
+      onboardingComplete = false;
+    }
+    return result;
+  }
+
   void register({required String name, required String email}) {
     profile = profile.copyWith(name: name, email: email);
     isAuthenticated = true;
@@ -225,9 +319,13 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void logout() {
+  Future<void> logout() async {
+    if (usesBackendAuth) {
+      await AuthService.signOut();
+    }
     isAuthenticated = false;
     onboardingComplete = false;
+    profile = demoProfile;
     rsvps.clear();
     notifyListeners();
   }

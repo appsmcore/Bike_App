@@ -7,6 +7,7 @@ import 'package:pacematch/data/app_state.dart';
 void main() {
   testWidgets('Login screen shows PaceMatch', (tester) async {
     final state = AppState();
+    await state.initAuth();
     final router = AppRouter.create(state);
 
     await tester.pumpWidget(

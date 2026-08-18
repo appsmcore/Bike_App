@@ -55,6 +55,13 @@ extension FitnessLevelX on FitnessLevel {
       };
 
   String get fullLabel => '$label — $funLabel';
+
+  IconData get icon => switch (this) {
+        FitnessLevel.beginner => Icons.coffee_outlined,
+        FitnessLevel.intermediate => Icons.directions_bike_outlined,
+        FitnessLevel.advanced => Icons.terrain_outlined,
+        FitnessLevel.expert => Icons.speed,
+      };
 }
 
 extension DifficultyX on Difficulty {

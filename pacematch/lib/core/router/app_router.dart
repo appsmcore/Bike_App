@@ -27,6 +27,8 @@ class AppRouter {
       initialLocation: '/home',
       refreshListenable: state,
       redirect: (context, routerState) {
+        if (!state.authReady) return null;
+
         final loc = routerState.matchedLocation;
         final loggingIn = loc == '/login' || loc == '/register';
         final onboarding = loc == '/onboarding';

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/layout/app_layout.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
@@ -27,81 +28,87 @@ class _CompanionsScreenState extends State<CompanionsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Riding companions')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        children: [
-          Text(
-            'Who you’ve shared the road with — ranked by the stories your legs remember.',
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (final metric in CompanionRankMetric.values) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      avatar: Icon(metric.icon, size: 16),
-                      label: Text(metric.label),
-                      selected: _metric == metric,
-                      onSelected: (_) => setState(() => _metric = metric),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _metric.subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.stone),
-          ),
-          const SizedBox(height: 20),
-          if (ranked.isEmpty)
-            _EmptyCompanions(theme: theme)
-          else ...[
-            _Podium(
-              top: ranked.take(3).toList(),
-              metric: _metric,
-              valueLabel: state.companionMetricLabel,
-              onOpen: (id) => context.push('/profile/rider/$id'),
-            ),
-            const SizedBox(height: 24),
-            Text('Full ranking', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 12),
-            for (var i = 0; i < ranked.length; i++) ...[
-              _RankRow(
-                rank: i + 1,
-                stats: ranked[i],
-                value: state.companionMetricLabel(ranked[i], _metric),
-                onTap: () =>
-                    context.push('/profile/rider/${ranked[i].rider.id}'),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ],
-          if (all.isNotEmpty) ...[
-            const SizedBox(height: 28),
-            Text('Ride DNA with each buddy', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 6),
+      body: AdaptiveBody(
+        child: ListView(
+          padding: AppLayout.pagePadding(context, top: 8, extraBottom: 16),
+          children: [
             Text(
-              'A quick fingerprint of how you ride together.',
-              style: theme.textTheme.bodySmall,
+              'Who you’ve shared the road with — ranked by the stories your legs remember.',
+              style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: 12),
-            for (final stats in all.take(6)) ...[
-              _CompanionDnaCard(
-                stats: stats,
-                onTap: () =>
-                    context.push('/profile/rider/${stats.rider.id}'),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 40,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (final metric in CompanionRankMetric.values) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        avatar: Icon(metric.icon, size: 16),
+                        label: Text(metric.label),
+                        selected: _metric == metric,
+                        onSelected: (_) => setState(() => _metric = metric),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 10),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _metric.subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.stone,
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (ranked.isEmpty)
+              _EmptyCompanions(theme: theme)
+            else ...[
+              _Podium(
+                top: ranked.take(3).toList(),
+                metric: _metric,
+                valueLabel: state.companionMetricLabel,
+                onOpen: (id) => context.push('/profile/rider/$id'),
+              ),
+              const SizedBox(height: 24),
+              Text('Full ranking', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 12),
+              for (var i = 0; i < ranked.length; i++) ...[
+                _RankRow(
+                  rank: i + 1,
+                  stats: ranked[i],
+                  value: state.companionMetricLabel(ranked[i], _metric),
+                  onTap: () =>
+                      context.push('/profile/rider/${ranked[i].rider.id}'),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+            if (all.isNotEmpty) ...[
+              const SizedBox(height: 28),
+              Text(
+                'Ride DNA with each buddy',
+                style: theme.textTheme.titleLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'A quick fingerprint of how you ride together.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              for (final stats in all.take(6)) ...[
+                _CompanionDnaCard(
+                  stats: stats,
+                  onTap: () => context.push('/profile/rider/${stats.rider.id}'),
+                ),
+                const SizedBox(height: 10),
+              ],
             ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -122,7 +129,11 @@ class _EmptyCompanions extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(Icons.groups_outlined, size: 40, color: theme.colorScheme.outline),
+          Icon(
+            Icons.groups_outlined,
+            size: 40,
+            color: theme.colorScheme.outline,
+          ),
           const SizedBox(height: 10),
           Text('No shared kilometers yet', style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
@@ -197,9 +208,9 @@ class _Podium extends StatelessWidget {
               Text(
                 valueLabel(stats, metric),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.forest,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: AppColors.forest,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 8),
               Container(

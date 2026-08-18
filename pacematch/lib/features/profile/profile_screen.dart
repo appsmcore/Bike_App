@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/layout/app_layout.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
@@ -57,8 +58,8 @@ class ProfileScreen extends StatelessWidget {
                 child: Text(
                   'Which ride is this from?',
                   style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               for (final ride in rides.take(12))
@@ -99,130 +100,142 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 36,
-                      backgroundColor: AppColors.forest,
-                      backgroundImage: profile.bikePhotoBytes != null
-                          ? MemoryImage(profile.bikePhotoBytes!)
-                          : null,
-                      child: profile.bikePhotoBytes == null
-                          ? Text(
-                              profile.name.isNotEmpty
-                                  ? profile.name[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                fontSize: 28,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            profile.name,
-                            style: theme.textTheme.headlineSmall,
-                          ),
-                          Text(profile.email),
-                          Text(
-                            profile.location,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
+      body: AdaptiveBody(
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                AppLayout.pageGutter(context),
+                8,
+                AppLayout.pageGutter(context),
+                0,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 36,
+                        backgroundColor: AppColors.forest,
+                        backgroundImage: profile.bikePhotoBytes != null
+                            ? MemoryImage(profile.bikePhotoBytes!)
+                            : null,
+                        child: profile.bikePhotoBytes == null
+                            ? Text(
+                                profile.name.isNotEmpty
+                                    ? profile.name[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            : null,
                       ),
-                    ),
-                  ],
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: () => _pickBikePhoto(context, state),
-                    child: Text(
-                      profile.bikePhotoBytes == null
-                          ? 'Set featured bike photo'
-                          : 'Change featured bike photo',
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              profile.name,
+                              style: theme.textTheme.headlineSmall,
+                            ),
+                            Text(profile.email),
+                            Text(
+                              profile.location,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => _pickBikePhoto(context, state),
+                      child: Text(
+                        profile.bikePhotoBytes == null
+                            ? 'Set featured bike photo'
+                            : 'Change featured bike photo',
+                      ),
                     ),
                   ),
-                ),
-                Text(profile.bio),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    _ProfileMetric(
-                      label: 'Rides',
-                      value: '${profile.ridesJoined}',
-                    ),
-                    _ProfileMetric(
-                      label: 'Memories',
-                      value: '${memories.length}',
-                    ),
-                    _ProfileMetric(
-                      label: 'Km',
-                      value: '${state.lifetimeJoinedKm.round()}',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Ride memories',
-                        style: theme.textTheme.titleLarge,
+                  Text(profile.bio),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      _ProfileMetric(
+                        label: 'Rides',
+                        value: '${profile.ridesJoined}',
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Add memory',
-                      onPressed: () => _addMemoryFromCompletedRide(context),
-                      icon: const Icon(Icons.add_a_photo_outlined),
-                      color: AppColors.forest,
-                    ),
-                  ],
-                ),
-                Text(
-                  'Your post-ride gallery — tap a shot to open it.',
-                  style: theme.textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-              ]),
-            ),
-          ),
-          if (memories.isEmpty)
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverToBoxAdapter(
-                child: RideMemoriesGrid(
-                  photos: memories,
-                  emptyTitle: 'Your gallery is empty',
-                  emptySubtitle:
-                      'After a ride, add photos from the ride page — or start here.',
-                  onAddTap: () => _addMemoryFromCompletedRide(context),
-                ),
+                      _ProfileMetric(
+                        label: 'Memories',
+                        value: '${memories.length}',
+                      ),
+                      _ProfileMetric(
+                        label: 'Km',
+                        value: '${state.lifetimeJoinedKm.round()}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Ride memories',
+                          style: theme.textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Add memory',
+                        onPressed: () => _addMemoryFromCompletedRide(context),
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        color: AppColors.forest,
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Your post-ride gallery — tap a shot to open it.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                ]),
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 2,
-                  mainAxisSpacing: 2,
+            ),
+            if (memories.isEmpty)
+              SliverPadding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppLayout.pageGutter(context),
                 ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
+                sliver: SliverToBoxAdapter(
+                  child: RideMemoriesGrid(
+                    photos: memories,
+                    emptyTitle: 'Your gallery is empty',
+                    emptySubtitle:
+                        'After a ride, add photos from the ride page — or start here.',
+                    onAddTap: () => _addMemoryFromCompletedRide(context),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: AppLayout.columnsFor(
+                      context,
+                      compact: 3,
+                      medium: 4,
+                      expanded: 5,
+                    ),
+                    crossAxisSpacing: 2,
+                    mainAxisSpacing: 2,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
                     final photo = memories[index];
                     return RideMemoryThumb(
                       photo: photo,
@@ -232,131 +245,143 @@ class ProfileScreen extends StatelessWidget {
                         initialIndex: index,
                       ),
                     );
-                  },
-                  childCount: memories.length,
+                  }, childCount: memories.length),
                 ),
               ),
-            ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Text('Fitness & bikes', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    Chip(label: Text(profile.fitnessLevel.fullLabel)),
-                    for (final bike in profile.bikeTypes)
-                      Chip(
-                        avatar: Icon(bike.icon, size: 16),
-                        label: Text(bike.label),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                AppLayout.pageGutter(context),
+                24,
+                AppLayout.pageGutter(context),
+                32,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  Text('Fitness & bikes', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(label: Text(profile.fitnessLevel.fullLabel)),
+                      for (final bike in profile.bikeTypes)
+                        Chip(
+                          avatar: Icon(bike.icon, size: 16),
+                          label: Text(bike.label),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Distance ${profile.preferredDistanceMin.toInt()}–${profile.preferredDistanceMax.toInt()} km\n'
+                    'Elevation ${profile.preferredElevationMin}–${profile.preferredElevationMax} m\n'
+                    'Terrain: $terrains\n'
+                    'Days: ${profile.preferredDays.join(', ')}',
+                  ),
+                  const SizedBox(height: 24),
+                  Text('Your riding life', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  _ProfileNavCard(
+                    icon: Icons.history,
+                    title: 'My rides',
+                    subtitle:
+                        '${state.completedRides.length} done · ${state.offeredRides.length} offered · ${state.upcomingJoinedRides.length} upcoming',
+                    onTap: () => context.push('/profile/my-rides'),
+                  ),
+                  const SizedBox(height: 10),
+                  _ProfileNavCard(
+                    icon: Icons.emoji_events_outlined,
+                    title: 'Riding companions',
+                    subtitle: () {
+                      final top = state.companionsRankedBy(
+                        CompanionRankMetric.sharedKm,
+                      );
+                      if (top.isEmpty) {
+                        return 'Rank who you’ve shared the most km & climbs with';
+                      }
+                      return 'Top buddy: ${top.first.rider.name.split(' ').first}';
+                    }(),
+                    onTap: () => context.push('/profile/companions'),
+                  ),
+                  const SizedBox(height: 24),
+                  Text('Stats', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _StatCard(
+                        label: 'Joined',
+                        value: '${profile.ridesJoined}',
                       ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Distance ${profile.preferredDistanceMin.toInt()}–${profile.preferredDistanceMax.toInt()} km\n'
-                  'Elevation ${profile.preferredElevationMin}–${profile.preferredElevationMax} m\n'
-                  'Terrain: $terrains\n'
-                  'Days: ${profile.preferredDays.join(', ')}',
-                ),
-                const SizedBox(height: 24),
-                Text('Your riding life', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 12),
-                _ProfileNavCard(
-                  icon: Icons.history,
-                  title: 'My rides',
-                  subtitle:
-                      '${state.completedRides.length} done · ${state.offeredRides.length} offered · ${state.upcomingJoinedRides.length} upcoming',
-                  onTap: () => context.push('/profile/my-rides'),
-                ),
-                const SizedBox(height: 10),
-                _ProfileNavCard(
-                  icon: Icons.emoji_events_outlined,
-                  title: 'Riding companions',
-                  subtitle: () {
-                    final top =
-                        state.companionsRankedBy(CompanionRankMetric.sharedKm);
-                    if (top.isEmpty) {
-                      return 'Rank who you’ve shared the most km & climbs with';
-                    }
-                    return 'Top buddy: ${top.first.rider.name.split(' ').first}';
-                  }(),
-                  onTap: () => context.push('/profile/companions'),
-                ),
-                const SizedBox(height: 24),
-                Text('Stats', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _StatCard(label: 'Joined', value: '${profile.ridesJoined}'),
-                    const SizedBox(width: 10),
-                    _StatCard(
-                      label: 'Organized',
-                      value: '${profile.ridesOrganized}',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _StatCard(
-                      label: 'Reliability',
-                      value: '${profile.reliabilityScore}',
-                    ),
-                    const SizedBox(width: 10),
-                    _StatCard(
-                      label: 'Community',
-                      value: '${profile.communityScore}',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _StatCard(
-                      label: 'Lifetime km',
-                      value: '${state.lifetimeJoinedKm.round()}',
-                    ),
-                    const SizedBox(width: 10),
-                    _StatCard(
-                      label: 'Lifetime elev',
-                      value: '${state.lifetimeJoinedElevationM}',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Text('Badges', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final badge in profile.badges)
-                      Chip(
-                        avatar:
-                            const Icon(Icons.military_tech_outlined, size: 18),
-                        label: Text(badge),
+                      const SizedBox(width: 10),
+                      _StatCard(
+                        label: 'Organized',
+                        value: '${profile.ridesOrganized}',
                       ),
-                  ],
-                ),
-                const SizedBox(height: 28),
-                OutlinedButton(
-                  onPressed: state.logout,
-                  child: const Text('Sign out'),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Mock auth · Supabase wiring comes next',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall,
-                ),
-              ]),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _StatCard(
+                        label: 'Reliability',
+                        value: '${profile.reliabilityScore}',
+                      ),
+                      const SizedBox(width: 10),
+                      _StatCard(
+                        label: 'Community',
+                        value: '${profile.communityScore}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _StatCard(
+                        label: 'Lifetime km',
+                        value: '${state.lifetimeJoinedKm.round()}',
+                      ),
+                      const SizedBox(width: 10),
+                      _StatCard(
+                        label: 'Lifetime elev',
+                        value: '${state.lifetimeJoinedElevationM}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text('Badges', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final badge in profile.badges)
+                        Chip(
+                          avatar: const Icon(
+                            Icons.military_tech_outlined,
+                            size: 18,
+                          ),
+                          label: Text(badge),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  OutlinedButton(
+                    onPressed: () => state.logout(),
+                    child: const Text('Sign out'),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    state.usesBackendAuth
+                        ? 'Signed in with Supabase'
+                        : 'Local demo auth',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ]),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

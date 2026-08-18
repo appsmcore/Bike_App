@@ -2,11 +2,41 @@
 
 Flutter app to discover and join group cycling rides that match your pace.
 
+**Web-first testing:** run in Chrome or deploy the web build so friends can sign up with real accounts (Supabase Auth).
+
+## Quick start (web)
+
+```powershell
+cd C:\Users\maxpi\Bike_App\pacematch
+copy .env.example .env
+# Fill SUPABASE_URL + SUPABASE_ANON_KEY (see supabase/README.md)
+flutter pub get
+flutter run -d chrome --web-port 7357
+```
+
+## Real login (Supabase)
+
+1. Create a free project at [supabase.com](https://supabase.com)
+2. Run the SQL migrations in `supabase/migrations/`
+3. Add keys to `.env` (see `.env.example`)
+4. Optional: disable email confirmation while testing
+
+Full setup: **[supabase/README.md](supabase/README.md)**
+
+## Deploy for friends
+
+```powershell
+.\scripts\build-web.ps1
+firebase deploy --only hosting   # or Netlify drop / Vercel
+```
+
+Add your live URL in Supabase → Authentication → URL configuration.
+
 ## Routing (same as the Vite playground)
 
 Uses **GraphHopper** first (bike profile; custom rules on paid plans), then **ORS**.
 
-### 1. Keys (one shared file)
+### Keys (one shared file)
 
 Copy and fill `pacematch/.env` (see `.env.example`):
 
@@ -15,18 +45,11 @@ GH_API_KEY=...
 ORS_API_KEY=...
 VITE_GH_API_KEY=...   # same values — used by the Node playground
 VITE_ORS_API_KEY=...
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
 ```
 
-### 2. Start Flutter app
-
-```powershell
-cd C:\Users\maxpi\Bike_App\pacematch
-flutter run -d chrome
-```
-
-No `--dart-define` needed when `.env` is present. Plan a route → **Confirm route & back to offer**.
-
-### 3. Optional: fast Node playground
+### Optional: fast Node playground
 
 ```powershell
 cd C:\Users\maxpi\Bike_App\pacematch\route-playground

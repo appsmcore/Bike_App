@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/layout/app_layout.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
 import '../../data/route_models.dart';
@@ -133,7 +134,13 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     );
     if (time == null) return;
     setState(() {
-      _startsAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _startsAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 
@@ -150,9 +157,9 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     final state = context.read<AppState>();
     final groups = state.groups;
     if (groups.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Create a group first')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Create a group first')));
       return;
     }
     final groupId = _groupId ?? groups.first.id;
@@ -216,207 +223,212 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final theme = Theme.of(context);
-    final memberGroups =
-        state.groups.where((g) => state.isMemberOf(g.id)).toList();
-    final options =
-        memberGroups.isNotEmpty ? memberGroups : state.groups.toList();
+    final memberGroups = state.groups
+        .where((g) => state.isMemberOf(g.id))
+        .toList();
+    final options = memberGroups.isNotEmpty
+        ? memberGroups
+        : state.groups.toList();
     final selectedGroupId =
         (_groupId != null && options.any((g) => g.id == _groupId))
-            ? _groupId
-            : (options.isNotEmpty ? options.first.id : null);
+        ? _groupId
+        : (options.isNotEmpty ? options.first.id : null);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Offer a ride')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          TextField(
-            controller: _title,
-            decoration: const InputDecoration(labelText: 'Ride title'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _description,
-            maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Description'),
-          ),
-          const SizedBox(height: 12),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Date & time'),
-            subtitle: Text(
-              '${_startsAt.day}.${_startsAt.month}.${_startsAt.year} '
-              '${_startsAt.hour.toString().padLeft(2, '0')}:'
-              '${_startsAt.minute.toString().padLeft(2, '0')}',
+      body: AdaptiveBody(
+        maxWidth: AppLayout.formMaxWidth,
+        child: ListView(
+          padding: AppLayout.pagePadding(context, top: 16, extraBottom: 12),
+          children: [
+            TextField(
+              controller: _title,
+              decoration: const InputDecoration(labelText: 'Ride title'),
             ),
-            trailing: const Icon(Icons.event),
-            onTap: _pickDateTime,
-          ),
-          MeetingPointField(
-            controller: _meeting,
-            biasNear: _plannedRoute?.start ?? _meetingPoint,
-            readOnly: _hasPlannedRoute,
-            onPlaceSelected: (place) {
-              setState(() => _meetingPoint = place.point);
-            },
-          ),
-          const SizedBox(height: 12),
-          if (options.isNotEmpty && selectedGroupId != null)
-            DropdownButtonFormField<String>(
-              key: ValueKey('group-$selectedGroupId'),
-              initialValue: selectedGroupId,
-              decoration: const InputDecoration(labelText: 'Group'),
-              items: [
-                for (final g in options)
-                  DropdownMenuItem(value: g.id, child: Text(g.name)),
-              ],
-              onChanged: (v) => setState(() => _groupId = v),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _description,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Description'),
             ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<BikeType>(
-            key: ValueKey('bike-$_bike'),
-            initialValue: _bike,
-            decoration: const InputDecoration(labelText: 'Bike type'),
-            items: [
-              for (final b in BikeType.values)
-                DropdownMenuItem(value: b, child: Text(b.label)),
-            ],
-            onChanged: (v) => setState(() => _bike = v!),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Route', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 6),
-                  Text(
-                    _plannedRoute == null
-                        ? 'Optional — plan on the map to lock distance & climb from the route. Meeting point is filled from the start.'
-                        : '${_plannedRoute!.distanceKm.toStringAsFixed(1)} km · '
-                            '${_plannedRoute!.elevationM} m · '
-                            '${_plannedRoute!.waypoints.length} waypoints'
-                            '${_plannedRoute!.flexibleRouting ? ' · any surface' : ''}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: _openPlanner,
-                        icon: const Icon(Icons.map_outlined),
-                        label: Text(
-                          _plannedRoute == null
-                              ? 'Plan route on map'
-                              : 'Edit route',
-                        ),
-                      ),
-                      if (_plannedRoute != null)
-                        TextButton.icon(
-                          onPressed: _clearPlannedRoute,
-                          icon: const Icon(Icons.close),
-                          label: const Text('Clear route'),
-                        ),
-                    ],
-                  ),
-                  if (_plannedRoute != null &&
-                      _plannedRoute!.geometry.length >= 2) ...[
-                    const SizedBox(height: 12),
-                    RoutePreviewMap(points: _plannedRoute!.geometry),
-                  ],
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Date & time'),
+              subtitle: Text(
+                '${_startsAt.day}.${_startsAt.month}.${_startsAt.year} '
+                '${_startsAt.hour.toString().padLeft(2, '0')}:'
+                '${_startsAt.minute.toString().padLeft(2, '0')}',
+              ),
+              trailing: const Icon(Icons.event),
+              onTap: _pickDateTime,
+            ),
+            MeetingPointField(
+              controller: _meeting,
+              biasNear: _plannedRoute?.start ?? _meetingPoint,
+              readOnly: _hasPlannedRoute,
+              onPlaceSelected: (place) {
+                setState(() => _meetingPoint = place.point);
+              },
+            ),
+            const SizedBox(height: 12),
+            if (options.isNotEmpty && selectedGroupId != null)
+              DropdownButtonFormField<String>(
+                key: ValueKey('group-$selectedGroupId'),
+                initialValue: selectedGroupId,
+                decoration: const InputDecoration(labelText: 'Group'),
+                items: [
+                  for (final g in options)
+                    DropdownMenuItem(value: g.id, child: Text(g.name)),
                 ],
+                onChanged: (v) => setState(() => _groupId = v),
+              ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<BikeType>(
+              key: ValueKey('bike-$_bike'),
+              initialValue: _bike,
+              decoration: const InputDecoration(labelText: 'Bike type'),
+              items: [
+                for (final b in BikeType.values)
+                  DropdownMenuItem(value: b, child: Text(b.label)),
+              ],
+              onChanged: (v) => setState(() => _bike = v!),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Route', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      _plannedRoute == null
+                          ? 'Optional — plan on the map to lock distance & climb from the route. Meeting point is filled from the start.'
+                          : '${_plannedRoute!.distanceKm.toStringAsFixed(1)} km · '
+                                '${_plannedRoute!.elevationM} m · '
+                                '${_plannedRoute!.waypoints.length} waypoints'
+                                '${_plannedRoute!.flexibleRouting ? ' · any surface' : ''}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: _openPlanner,
+                          icon: const Icon(Icons.map_outlined),
+                          label: Text(
+                            _plannedRoute == null
+                                ? 'Plan route on map'
+                                : 'Edit route',
+                          ),
+                        ),
+                        if (_plannedRoute != null)
+                          TextButton.icon(
+                            onPressed: _clearPlannedRoute,
+                            icon: const Icon(Icons.close),
+                            label: const Text('Clear route'),
+                          ),
+                      ],
+                    ),
+                    if (_plannedRoute != null &&
+                        _plannedRoute!.geometry.length >= 2) ...[
+                      const SizedBox(height: 12),
+                      RoutePreviewMap(points: _plannedRoute!.geometry),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<Difficulty>(
-            key: ValueKey('diff-$_difficulty'),
-            initialValue: _difficulty,
-            decoration: const InputDecoration(labelText: 'Difficulty'),
-            items: [
-              for (final d in Difficulty.values)
-                DropdownMenuItem(
-                  value: d,
-                  child: Text('${d.emoji} ${d.label}'),
-                ),
-            ],
-            onChanged: (v) => setState(() => _difficulty = v!),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<FitnessLevel>(
-            key: ValueKey('skill-$_skill'),
-            initialValue: _skill,
-            decoration: const InputDecoration(labelText: 'Skill level'),
-            items: [
-              for (final s in FitnessLevel.values)
-                DropdownMenuItem(value: s, child: Text(s.fullLabel)),
-            ],
-            onChanged: (v) => setState(() => _skill = v!),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _distance,
-                  readOnly: _hasPlannedRoute,
-                  enableInteractiveSelection: !_hasPlannedRoute,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+            const SizedBox(height: 12),
+            DropdownButtonFormField<Difficulty>(
+              key: ValueKey('diff-$_difficulty'),
+              initialValue: _difficulty,
+              decoration: const InputDecoration(labelText: 'Difficulty'),
+              items: [
+                for (final d in Difficulty.values)
+                  DropdownMenuItem(
+                    value: d,
+                    child: Text('${d.emoji} ${d.label}'),
                   ),
-                  decoration: InputDecoration(
-                    labelText: 'Distance km',
-                    hintText: _hasPlannedRoute ? null : 'Enter manually',
-                    helperText: _hasPlannedRoute
-                        ? 'Locked from map route'
-                        : 'Editable until a route is planned',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _elevation,
-                  readOnly: _hasPlannedRoute,
-                  enableInteractiveSelection: !_hasPlannedRoute,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Elevation m',
-                    hintText: _hasPlannedRoute ? null : 'Enter manually',
-                    helperText: _hasPlannedRoute
-                        ? 'Locked from map route'
-                        : 'Editable until a route is planned',
+              ],
+              onChanged: (v) => setState(() => _difficulty = v!),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<FitnessLevel>(
+              key: ValueKey('skill-$_skill'),
+              initialValue: _skill,
+              decoration: const InputDecoration(labelText: 'Skill level'),
+              items: [
+                for (final s in FitnessLevel.values)
+                  DropdownMenuItem(value: s, child: Text(s.fullLabel)),
+              ],
+              onChanged: (v) => setState(() => _skill = v!),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _distance,
+                    readOnly: _hasPlannedRoute,
+                    enableInteractiveSelection: !_hasPlannedRoute,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Distance km',
+                      hintText: _hasPlannedRoute ? null : 'Enter manually',
+                      helperText: _hasPlannedRoute
+                          ? 'Locked from map route'
+                          : 'Editable until a route is planned',
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _limit,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Rider limit'),
-          ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: () {
-              _groupId = selectedGroupId;
-              _submit();
-            },
-            child: const Text('Publish ride'),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tip: create a group first if you want your own club rides.',
-            style: Theme.of(context).textTheme.bodySmall,
-            textAlign: TextAlign.center,
-          ),
-        ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _elevation,
+                    readOnly: _hasPlannedRoute,
+                    enableInteractiveSelection: !_hasPlannedRoute,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Elevation m',
+                      hintText: _hasPlannedRoute ? null : 'Enter manually',
+                      helperText: _hasPlannedRoute
+                          ? 'Locked from map route'
+                          : 'Editable until a route is planned',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _limit,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Rider limit'),
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: () {
+                _groupId = selectedGroupId;
+                _submit();
+              },
+              child: const Text('Publish ride'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tip: create a group first if you want your own club rides.',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

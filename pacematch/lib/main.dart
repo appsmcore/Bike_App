@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'core/config/routing_config.dart';
+import 'core/config/supabase_config.dart';
 import 'core/router/app_router.dart';
 import 'data/app_state.dart';
+import 'services/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,9 +17,11 @@ Future<void> main() async {
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
 
-  await _loadRoutingEnv();
+  await _loadEnv();
+  await AuthService.initialize();
 
   final appState = AppState();
+  await appState.initAuth();
   final router = AppRouter.create(appState);
 
   runApp(
@@ -28,14 +32,16 @@ Future<void> main() async {
   );
 }
 
-Future<void> _loadRoutingEnv() async {
+Future<void> _loadEnv() async {
   try {
     await dotenv.load(fileName: '.env');
-    RoutingConfig.applyDotenv(Map<String, String>.from(dotenv.env));
+    final env = Map<String, String>.from(dotenv.env);
+    RoutingConfig.applyDotenv(env);
+    SupabaseConfig.applyDotenv(env);
   } catch (e) {
     // Missing .env is fine when keys come from --dart-define.
     if (kDebugMode) {
-      debugPrint('Routing .env not loaded ($e). Using dart-define if set.');
+      debugPrint('Env not loaded ($e). Using dart-define if set.');
     }
   }
 }

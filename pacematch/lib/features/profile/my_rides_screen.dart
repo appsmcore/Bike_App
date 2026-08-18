@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/layout/app_layout.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/app_state.dart';
 import '../../data/models.dart';
@@ -31,40 +32,42 @@ class MyRidesScreen extends StatelessWidget {
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            _RideListTab(
-              rides: completed,
-              emptyTitle: 'No completed rides yet',
-              emptyBody:
-                  'Join a group ride and it’ll show up here after the start.',
-              header: completed.isEmpty
-                  ? null
-                  : _HistoryHeader(
-                      km: state.lifetimeJoinedKm,
-                      elevationM: state.lifetimeJoinedElevationM,
-                      rideCount: completed.length,
-                    ),
-              badgeFor: (ride) {
-                final n = state.photosForRide(ride.id).length;
-                final date = DateFormat('MMM d').format(ride.startsAt);
-                return n == 0 ? date : '$date · $n photos';
-              },
-            ),
-            _RideListTab(
-              rides: offered,
-              emptyTitle: 'You haven’t offered a ride yet',
-              emptyBody: 'Host a spin from Home → Offer a ride.',
-              badgeFor: (ride) => ride.isPast ? 'Done' : 'Upcoming',
-            ),
-            _RideListTab(
-              rides: upcoming,
-              emptyTitle: 'Nothing confirmed yet',
-              emptyBody: 'Hit Join on a ride to lock it into your calendar.',
-              badgeFor: (ride) =>
-                  DateFormat('EEE HH:mm').format(ride.startsAt),
-            ),
-          ],
+        body: AdaptiveBody(
+          child: TabBarView(
+            children: [
+              _RideListTab(
+                rides: completed,
+                emptyTitle: 'No completed rides yet',
+                emptyBody:
+                    'Join a group ride and it’ll show up here after the start.',
+                header: completed.isEmpty
+                    ? null
+                    : _HistoryHeader(
+                        km: state.lifetimeJoinedKm,
+                        elevationM: state.lifetimeJoinedElevationM,
+                        rideCount: completed.length,
+                      ),
+                badgeFor: (ride) {
+                  final n = state.photosForRide(ride.id).length;
+                  final date = DateFormat('MMM d').format(ride.startsAt);
+                  return n == 0 ? date : '$date · $n photos';
+                },
+              ),
+              _RideListTab(
+                rides: offered,
+                emptyTitle: 'You haven’t offered a ride yet',
+                emptyBody: 'Host a spin from Home → Offer a ride.',
+                badgeFor: (ride) => ride.isPast ? 'Done' : 'Upcoming',
+              ),
+              _RideListTab(
+                rides: upcoming,
+                emptyTitle: 'Nothing confirmed yet',
+                emptyBody: 'Hit Join on a ride to lock it into your calendar.',
+                badgeFor: (ride) =>
+                    DateFormat('EEE HH:mm').format(ride.startsAt),
+              ),
+            ],
+          ),
         ),
         bottomNavigationBar: upcoming.isEmpty && completed.isEmpty
             ? null
@@ -111,22 +114,23 @@ class _HistoryHeader extends StatelessWidget {
         ),
       ),
       child: Row(
-        children: [
-          _HeroStat(label: 'Rides', value: '$rideCount'),
-          _HeroStat(label: 'Distance', value: '${km.round()} km'),
-          _HeroStat(label: 'Climb', value: '$elevationM m'),
-        ]
-            .map(
-              (w) => Expanded(
-                child: DefaultTextStyle(
-                  style: theme.textTheme.bodySmall!.copyWith(
-                    color: Colors.white70,
+        children:
+            [
+                  _HeroStat(label: 'Rides', value: '$rideCount'),
+                  _HeroStat(label: 'Distance', value: '${km.round()} km'),
+                  _HeroStat(label: 'Climb', value: '$elevationM m'),
+                ]
+                .map(
+                  (w) => Expanded(
+                    child: DefaultTextStyle(
+                      style: theme.textTheme.bodySmall!.copyWith(
+                        color: Colors.white70,
+                      ),
+                      child: w,
+                    ),
                   ),
-                  child: w,
-                ),
-              ),
-            )
-            .toList(),
+                )
+                .toList(),
       ),
     );
   }
@@ -201,7 +205,7 @@ class _RideListTab extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      padding: AppLayout.pagePadding(context, top: 16, extraBottom: 16),
       children: [
         if (header != null) header!,
         for (final ride in rides) ...[

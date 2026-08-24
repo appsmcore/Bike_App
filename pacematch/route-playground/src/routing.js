@@ -54,15 +54,22 @@ function customModel(bikeType, flexible) {
 }
 
 function sanitizeAscent(ascentM, distanceKm, elevations = []) {
-  let ascent = Math.round(ascentM || 0);
-  const recomputed = ascentFromSamples(elevations);
-  if (ascent <= 0 && recomputed > 0) ascent = recomputed;
-  if (ascent > 5000 || (recomputed > 0 && ascent > recomputed * 3 + 200)) {
-    ascent = recomputed || ascent;
+  const api = Math.round(ascentM || 0);
+  const fromSamples = ascentFromSamples(elevations);
+  let chosen;
+  if (api > 0 && fromSamples > 0) {
+    chosen =
+      api > 8000 && api > fromSamples * 2.5
+        ? fromSamples
+        : Math.max(api, fromSamples);
+  } else {
+    chosen = api > 0 ? api : fromSamples;
   }
   const byDistance =
-    distanceKm <= 0 ? 6000 : Math.min(8000, Math.max(200, Math.round(distanceKm * 180)));
-  return Math.min(ascent, byDistance);
+    distanceKm <= 0
+      ? 8000
+      : Math.min(12000, Math.max(300, Math.round(distanceKm * 250)));
+  return Math.min(chosen, byDistance);
 }
 
 function smoothElev(raw, window = 5) {
@@ -87,7 +94,7 @@ function ascentFromSamples(elevations) {
   let gain = 0;
   for (let i = 1; i < s.length; i++) {
     const d = s[i] - s[i - 1];
-    if (d > 4) gain += d;
+    if (d > 0) gain += d;
   }
   return Math.round(gain);
 }

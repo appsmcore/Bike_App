@@ -36,6 +36,15 @@ extension BikeTypeX on BikeType {
         BikeType.touring => 'TR',
         BikeType.ebike => 'E',
       };
+
+  /// Strong, distinct color so bike types scan quickly in dense lists.
+  Color get color => switch (this) {
+        BikeType.road => const Color(0xFF1A7A4C),
+        BikeType.mtb => const Color(0xFF6B3F2A),
+        BikeType.gravel => const Color(0xFFC4782A),
+        BikeType.touring => const Color(0xFF2F6FED),
+        BikeType.ebike => const Color(0xFF0D9488),
+      };
 }
 
 extension FitnessLevelX on FitnessLevel {
@@ -144,6 +153,9 @@ class Ride {
   final List<double> routeLatLngs;
 
   bool get hasRoute => routeLatLngs.length >= 4;
+
+  /// True when the ride is not tied to a cycling group.
+  bool get isOpenRide => groupId.isEmpty;
 
   bool get isPast => startsAt.isBefore(DateTime.now());
 }

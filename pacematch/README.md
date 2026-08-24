@@ -14,12 +14,13 @@ flutter pub get
 flutter run -d chrome --web-port 7357
 ```
 
-## Real login (Supabase)
+## Real login + shared data (Supabase)
 
 1. Create a free project at [supabase.com](https://supabase.com)
-2. Run the SQL migrations in `supabase/migrations/`
+2. Run **all** SQL migrations in `supabase/migrations/` (including `20260824000000_shared_groups_rides.sql`)
 3. Add keys to `.env` (see `.env.example`)
 4. Optional: disable email confirmation while testing
+5. Friends sign in with their own accounts — groups/rides sync via Supabase
 
 Full setup: **[supabase/README.md](supabase/README.md)**
 

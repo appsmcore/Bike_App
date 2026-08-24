@@ -16,14 +16,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _page = PageController();
   int _index = 0;
 
-  void _next(AppState state) {
+  Future<void> _next(AppState state) async {
+    if (_index == 0 && state.draftBikes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pick at least one bike type to continue.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (_index < 2) {
       _page.nextPage(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
       );
     } else {
-      state.completeOnboarding();
+      await state.completeOnboarding();
     }
   }
 
@@ -77,7 +86,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Padding(
                 padding: EdgeInsets.fromLTRB(gutter, 8, gutter, 16),
                 child: FilledButton(
-                  onPressed: () => _next(state),
+                  onPressed: (_index == 0 && state.draftBikes.isEmpty)
+                      ? null
+                      : () => _next(state),
                   child: Text(_index == 2 ? 'Finish' : 'Continue'),
                 ),
               ),
@@ -162,17 +173,39 @@ class _PrefsStep extends StatelessWidget {
   final AppState state;
 
   static const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const distanceMaxKm = 250.0;
+  static const elevationMaxM = 6000.0;
 
   @override
   Widget build(BuildContext context) {
     return _StepFrame(
       title: 'Riding preferences',
-      subtitle: 'Distance, climb and when you like to ride.',
+      subtitle: 'How far — and how high — are you willing to go?',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final fits = constraints.maxHeight >= 420;
-          final distance = _sliderCard(context, isDistance: true);
-          final elevation = _sliderCard(context, isDistance: false);
+          final fits = constraints.maxHeight >= 480;
+          final distance = _MadnessRangeCard(
+            icon: Icons.straighten,
+            title: 'Distance',
+            unit: 'km',
+            values: state.draftDistance,
+            min: 10,
+            max: distanceMaxKm,
+            divisions: 48,
+            vibe: _distanceVibe(state.draftDistance.end),
+            onChanged: state.setDraftDistance,
+          );
+          final elevation = _MadnessRangeCard(
+            icon: Icons.terrain,
+            title: 'Elevation',
+            unit: 'm',
+            values: state.draftElevation,
+            min: 0,
+            max: elevationMaxM,
+            divisions: 60,
+            vibe: _elevationVibe(state.draftElevation.end),
+            onChanged: state.setDraftElevation,
+          );
           final terrain = _chipCard(
             context,
             title: 'Terrain style',
@@ -209,9 +242,9 @@ class _PrefsStep extends StatelessWidget {
           if (!fits) {
             return ListView(
               children: [
-                SizedBox(height: 132, child: distance),
+                SizedBox(height: 168, child: distance),
                 const SizedBox(height: 12),
-                SizedBox(height: 132, child: elevation),
+                SizedBox(height: 168, child: elevation),
                 const SizedBox(height: 12),
                 terrain,
                 const SizedBox(height: 12),
@@ -237,38 +270,101 @@ class _PrefsStep extends StatelessWidget {
     );
   }
 
-  Widget _sliderCard(BuildContext context, {required bool isDistance}) {
-    final theme = Theme.of(context);
-    return _PrefCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            isDistance
-                ? 'Distance: ${state.draftDistance.start.round()}–${state.draftDistance.end.round()} km'
-                : 'Elevation: ${state.draftElevation.start.round()}–${state.draftElevation.end.round()} m',
-            style: theme.textTheme.titleSmall,
-          ),
-          const Spacer(),
-          RangeSlider(
-            values: isDistance ? state.draftDistance : state.draftElevation,
-            min: isDistance ? 10 : 0,
-            max: isDistance ? 160 : 3500,
-            divisions: isDistance ? 30 : 35,
-            labels: RangeLabels(
-              isDistance
-                  ? '${state.draftDistance.start.round()}'
-                  : '${state.draftElevation.start.round()}',
-              isDistance
-                  ? '${state.draftDistance.end.round()}'
-                  : '${state.draftElevation.end.round()}',
-            ),
-            onChanged: isDistance
-                ? state.setDraftDistance
-                : state.setDraftElevation,
-          ),
-        ],
-      ),
+  static _RideVibe _distanceVibe(double maxKm) {
+    if (maxKm >= 230) {
+      return const _RideVibe(
+        label: 'Certified lunatic',
+        detail: '250 km? Friends are drafting a missing-person poster.',
+        heat: 1,
+        icon: Icons.local_fire_department,
+      );
+    }
+    if (maxKm >= 190) {
+      return const _RideVibe(
+        label: 'Slightly unhinged',
+        detail: 'That is not a ride — that is a personal vendetta.',
+        heat: 0.85,
+        icon: Icons.psychology_alt,
+      );
+    }
+    if (maxKm >= 150) {
+      return const _RideVibe(
+        label: 'Century menace',
+        detail: 'Legs filed a formal complaint. You ignored it.',
+        heat: 0.7,
+        icon: Icons.bolt,
+      );
+    }
+    if (maxKm >= 110) {
+      return const _RideVibe(
+        label: 'Serious engine',
+        detail: 'Long enough to earn cake without looking suspicious.',
+        heat: 0.5,
+        icon: Icons.speed,
+      );
+    }
+    if (maxKm >= 70) {
+      return const _RideVibe(
+        label: 'Weekend warrior',
+        detail: 'Solid spin. Coffee stops still allowed.',
+        heat: 0.3,
+        icon: Icons.directions_bike,
+      );
+    }
+    return const _RideVibe(
+      label: 'Easy spinner',
+      detail: 'Keep it chill — nobody is calling you crazy yet.',
+      heat: 0.12,
+      icon: Icons.coffee,
+    );
+  }
+
+  static _RideVibe _elevationVibe(double maxM) {
+    if (maxM >= 5200) {
+      return const _RideVibe(
+        label: 'Vertical psychopath',
+        detail: '6000 m? Gravity has blocked your number.',
+        heat: 1,
+        icon: Icons.volcano,
+      );
+    }
+    if (maxM >= 4000) {
+      return const _RideVibe(
+        label: 'Needs supervision',
+        detail: 'Your knees just filed for early retirement.',
+        heat: 0.85,
+        icon: Icons.warning_amber_rounded,
+      );
+    }
+    if (maxM >= 2800) {
+      return const _RideVibe(
+        label: 'Alpine anarchist',
+        detail: 'Pass hunting season is open. Forever.',
+        heat: 0.7,
+        icon: Icons.landscape,
+      );
+    }
+    if (maxM >= 1600) {
+      return const _RideVibe(
+        label: 'Climb crusher',
+        detail: 'Hills notice you and quietly panic.',
+        heat: 0.5,
+        icon: Icons.trending_up,
+      );
+    }
+    if (maxM >= 700) {
+      return const _RideVibe(
+        label: 'Rolling loyalist',
+        detail: 'A few kicks — nothing a gel pack cannot fix.',
+        heat: 0.3,
+        icon: Icons.terrain,
+      );
+    }
+    return const _RideVibe(
+      label: 'Flatland tourist',
+      detail: 'Elevation? You prefer your suffering horizontal.',
+      heat: 0.12,
+      icon: Icons.horizontal_rule,
     );
   }
 
@@ -284,6 +380,174 @@ class _PrefsStep extends StatelessWidget {
           Text(title, style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           child,
+        ],
+      ),
+    );
+  }
+}
+
+class _RideVibe {
+  const _RideVibe({
+    required this.label,
+    required this.detail,
+    required this.heat,
+    required this.icon,
+  });
+
+  final String label;
+  final String detail;
+  final double heat; // 0..1 how "crazy"
+  final IconData icon;
+}
+
+class _MadnessRangeCard extends StatelessWidget {
+  const _MadnessRangeCard({
+    required this.icon,
+    required this.title,
+    required this.unit,
+    required this.values,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.vibe,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String unit;
+  final RangeValues values;
+  final double min;
+  final double max;
+  final int divisions;
+  final _RideVibe vibe;
+  final ValueChanged<RangeValues> onChanged;
+
+  Color _heatColor(ColorScheme scheme) {
+    return Color.lerp(
+          scheme.primary,
+          const Color(0xFFC62828),
+          vibe.heat,
+        ) ??
+        scheme.primary;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final heat = _heatColor(scheme);
+    final start = values.start.round();
+    final end = values.end.round();
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Color.lerp(scheme.outline, heat, vibe.heat * 0.85)!,
+          width: vibe.heat > 0.75 ? 2 : 1,
+        ),
+        boxShadow: vibe.heat > 0.7
+            ? [
+                BoxShadow(
+                  color: heat.withValues(alpha: 0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : null,
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: heat),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '$start–$end $unit',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: heat,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: heat.withValues(alpha: 0.08 + vibe.heat * 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(vibe.icon, size: 18, color: heat),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        vibe.label,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: heat,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        vibe.detail,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurface.withValues(alpha: 0.7),
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: heat,
+              thumbColor: heat,
+              overlayColor: heat.withValues(alpha: 0.12),
+              inactiveTrackColor: heat.withValues(alpha: 0.18),
+              rangeThumbShape: const RoundRangeSliderThumbShape(
+                enabledThumbRadius: 9,
+              ),
+            ),
+            child: RangeSlider(
+              values: RangeValues(
+                values.start.clamp(min, max),
+                values.end.clamp(min, max),
+              ),
+              min: min,
+              max: max,
+              divisions: divisions,
+              labels: RangeLabels('$start', '$end'),
+              onChanged: onChanged,
+            ),
+          ),
         ],
       ),
     );

@@ -31,7 +31,8 @@ class RideDetailScreen extends StatelessWidget {
     }
 
     final rsvp = state.rsvpFor(ride.id);
-    final fromMyGroup = state.isMemberOf(ride.groupId);
+    final fromMyGroup =
+        !ride.isOpenRide && state.isMemberOf(ride.groupId);
 
     return Scaffold(
       body: CustomScrollView(
@@ -97,7 +98,7 @@ class RideDetailScreen extends StatelessWidget {
                   Text(ride.meetingPoint, style: theme.textTheme.bodyLarge),
                   const SizedBox(height: 4),
                   Text(
-                    ride.groupName,
+                    ride.isOpenRide ? 'Open ride' : ride.groupName,
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: AppColors.forest,
                       fontWeight: FontWeight.w700,
@@ -147,10 +148,11 @@ class RideDetailScreen extends StatelessWidget {
                   const SizedBox(height: 28),
                   _ConfirmedRidersSection(rideId: ride.id),
                   const SizedBox(height: 24),
-                  TextButton(
-                    onPressed: () => context.push('/groups/${ride.groupId}'),
-                    child: const Text('View group'),
-                  ),
+                  if (!ride.isOpenRide)
+                    TextButton(
+                      onPressed: () => context.push('/groups/${ride.groupId}'),
+                      child: const Text('View group'),
+                    ),
                   const SizedBox(height: 24),
                 ],
               ),

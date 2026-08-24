@@ -26,24 +26,36 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a group name')),
       );
       return;
     }
-    final group = context.read<AppState>().createGroup(
-      name: _name.text.trim(),
-      description: _description.text.trim().isEmpty
-          ? 'A new PaceMatch group'
-          : _description.text.trim(),
-      location: _location.text.trim().isEmpty
-          ? 'South Tyrol'
-          : _location.text.trim(),
-      isPrivate: _private,
-    );
-    context.go('/groups/${group.id}');
+    try {
+      final group = await context.read<AppState>().createGroup(
+            name: _name.text.trim(),
+            description: _description.text.trim().isEmpty
+                ? 'A new PaceMatch group'
+                : _description.text.trim(),
+            location: _location.text.trim().isEmpty
+                ? 'South Tyrol'
+                : _location.text.trim(),
+            isPrivate: _private,
+          );
+      if (!mounted) return;
+      context.go('/groups/${group.id}');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not save group: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -74,7 +86,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Private group'),
-              subtitle: const Text('New members need approval (demo only)'),
+              subtitle: const Text(
+                'Only members see private groups — use Public so friends can find it',
+              ),
               value: _private,
               onChanged: (v) => setState(() => _private = v),
             ),

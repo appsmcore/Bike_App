@@ -126,21 +126,17 @@ class RoutingService {
     required List<double> rawElevations,
     required int preferredAscentM,
   }) {
-    final profile = ElevationMath.profilePoints(rawElevations, max: 48);
+    final full =
+        rawElevations.isNotEmpty ? rawElevations : route.elevationProfile;
+    final profile = ElevationMath.profilePoints(full, max: 64);
     final display =
         profile.isNotEmpty ? profile : route.elevationProfile;
-    // Climb must match the chart series, not a separate API ascend value.
-    final ascent = display.length >= 2
-        ? ElevationMath.sanitizeAscent(
-            ascentM: ElevationMath.climbFromProfile(display),
-            distanceKm: route.distanceKm,
-            elevations: display,
-          )
-        : ElevationMath.sanitizeAscent(
-            ascentM: preferredAscentM,
-            distanceKm: route.distanceKm,
-            elevations: rawElevations,
-          );
+    // Cumulative climb from full samples / API — not from chart points.
+    final ascent = ElevationMath.resolveClimb(
+      apiAscentM: preferredAscentM,
+      distanceKm: route.distanceKm,
+      fullElevations: full,
+    );
     return route.copyWith(
       elevationM: ascent,
       elevationProfile: display,
@@ -240,13 +236,12 @@ class RoutingService {
     final simplified = simplifyGeometry(points, _maxGeometryPoints);
     final elevations = _parseGhElevations(path['points']);
     final distanceKm = double.parse((distanceM / 1000).toStringAsFixed(1));
-    final profilePoints = ElevationMath.profilePoints(elevations, max: 48);
-    final ascentM = ElevationMath.sanitizeAscent(
-      ascentM: profilePoints.length >= 2
-          ? ElevationMath.climbFromProfile(profilePoints)
-          : ascent.round(),
+    final profilePoints = ElevationMath.profilePoints(elevations, max: 64);
+    // GraphHopper `ascend` is cumulative; also sum full elev samples as backup.
+    final ascentM = ElevationMath.resolveClimb(
+      apiAscentM: ascent.round(),
       distanceKm: distanceKm,
-      elevations: profilePoints.isNotEmpty ? profilePoints : elevations,
+      fullElevations: elevations,
     );
 
     final label = useCustomModel
@@ -524,17 +519,13 @@ class RoutingService {
     final rawAscent = _readDouble(summary?['ascent']) ??
         _readDouble(props['ascent']) ??
         _ascentFromSegments(segments) ??
-        (elevations.length >= 2
-            ? ElevationMath.ascentMeters(elevations).toDouble()
-            : 0);
+        0;
 
-    final profilePoints = ElevationMath.profilePoints(elevations, max: 48);
-    final ascentM = ElevationMath.sanitizeAscent(
-      ascentM: profilePoints.length >= 2
-          ? ElevationMath.climbFromProfile(profilePoints)
-          : rawAscent.round(),
+    final profilePoints = ElevationMath.profilePoints(elevations, max: 64);
+    final ascentM = ElevationMath.resolveClimb(
+      apiAscentM: rawAscent.round(),
       distanceKm: distanceKm,
-      elevations: profilePoints.isNotEmpty ? profilePoints : elevations,
+      fullElevations: elevations,
     );
 
     return PlannedRoute(
@@ -603,7 +594,8 @@ class RoutingService {
   Future<({int ascentM, List<double> profile})> _elevationFor(
     List<LatLng> points,
   ) async {
-    final samples = simplifyGeometry(points, 40);
+    // Denser samples → better cumulative climb (not just start/end relief).
+    final samples = simplifyGeometry(points, 120);
     if (samples.length < 2) {
       return (ascentM: 0, profile: <double>[]);
     }
@@ -634,8 +626,8 @@ class RoutingService {
     }
 
     return (
-      ascentM: ElevationMath.ascentMeters(elev),
-      profile: ElevationMath.profilePoints(elev, max: 48),
+      ascentM: ElevationMath.cumulativeAscent(elev),
+      profile: ElevationMath.profilePoints(elev, max: 64),
     );
   }
 

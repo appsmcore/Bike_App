@@ -185,11 +185,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         OutlinedButton(
                           onPressed: _loading
                               ? null
-                              : () {
-                                  context.read<AppState>().login(
-                                        email: 'demo@pacematch.app',
-                                        name: 'Demo Rider',
-                                      );
+                              : () async {
+                                  final state = context.read<AppState>();
+                                  state.login(
+                                    email: 'demo@pacematch.app',
+                                    name: 'Demo Rider',
+                                    notify: false,
+                                  );
+                                  await state.restoreSavedProfile();
                                 },
                           child: const Text('Continue as demo rider'),
                         ),

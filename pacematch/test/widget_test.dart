@@ -1,10 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pacematch/app.dart';
 import 'package:pacematch/core/router/app_router.dart';
 import 'package:pacematch/data/app_state.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('Login screen shows PaceMatch', (tester) async {
     final state = AppState();
     await state.initAuth();

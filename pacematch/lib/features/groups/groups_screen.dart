@@ -14,23 +14,57 @@ class GroupsScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Groups')),
+      appBar: AppBar(
+        title: const Text('Groups'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: state.syncing
+                ? null
+                : () => context.read<AppState>().refreshSharedData(),
+            icon: state.syncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/create-group'),
         icon: const Icon(Icons.group_add),
         label: const Text('New group'),
       ),
       body: AdaptiveBody(
-        child: ListView.separated(
+        child: RefreshIndicator(
+          onRefresh: () => context.read<AppState>().refreshSharedData(),
+          child: ListView.separated(
           padding: EdgeInsets.fromLTRB(
             AppLayout.pageGutter(context),
             8,
             AppLayout.pageGutter(context),
             88,
           ),
-          itemCount: state.groups.length,
+          itemCount: state.groups.isEmpty ? 1 : state.groups.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
+            if (state.groups.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  state.syncError != null
+                      ? 'Could not load groups.\n${state.syncError}\n\n'
+                          'Did you run the latest Supabase SQL migration?'
+                      : state.usesBackendAuth
+                          ? 'No shared groups yet.\nCreate a public group so friends can join.'
+                          : 'No groups yet.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              );
+            }
             final group = state.groups[index];
             final member = state.isMemberOf(group.id);
             return Material(
@@ -90,6 +124,7 @@ class GroupsScreen extends StatelessWidget {
               ),
             );
           },
+        ),
         ),
       ),
     );

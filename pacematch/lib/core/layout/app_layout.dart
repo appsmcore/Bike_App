@@ -86,14 +86,16 @@ class AdaptiveBody extends StatelessWidget {
             ? constraints.maxWidth
             : maxWidth;
         final width = math.min(cap, constraints.maxWidth);
-        return Align(
-          alignment: alignment,
-          child: SizedBox(
-            width: width,
-            height: constraints.hasBoundedHeight ? constraints.maxHeight : null,
-            child: child,
-          ),
-        );
+        // Fill available height so Expanded/ListView children get a viewport.
+        final child = constraints.hasBoundedHeight &&
+                constraints.maxHeight.isFinite
+            ? SizedBox(
+                width: width,
+                height: constraints.maxHeight,
+                child: this.child,
+              )
+            : SizedBox(width: width, child: this.child);
+        return Align(alignment: alignment, child: child);
       },
     );
   }

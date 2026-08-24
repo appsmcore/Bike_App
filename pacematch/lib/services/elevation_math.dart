@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
-/// Shared elevation helpers — climb is derived from the same samples as the chart.
+/// Elevation helpers.
+///
+/// Climb = **cumulative ascent** (sum of every uphill segment), NOT net
+/// elevation change (end − start) and NOT max − min on the chart.
 abstract final class ElevationMath {
   /// Moving-average smooth (window odd, >= 3).
   static List<double> smooth(List<double> raw, {int window = 5}) {
@@ -21,13 +24,12 @@ abstract final class ElevationMath {
     return out;
   }
 
-  /// Cumulative ascent in meters (sum of ups along the profile).
+  /// Sum of all uphill meters along [elevations] (after light smoothing).
   ///
-  /// After smoothing, use a small [minStepM] so gradual climbs still count;
-  /// a large threshold (e.g. 4 m per sample) under-reports real routes.
-  static int ascentMeters(
+  /// Use the **full** sample list from the router/DEM — never a heavily
+  /// downsampled chart series, or intermediate climbs disappear.
+  static int cumulativeAscent(
     List<double> elevations, {
-    double minStepM = 1,
     int smoothWindow = 5,
   }) {
     if (elevations.length < 2) return 0;
@@ -35,39 +37,51 @@ abstract final class ElevationMath {
     var gain = 0.0;
     for (var i = 1; i < s.length; i++) {
       final d = s[i] - s[i - 1];
-      if (d > minStepM) gain += d;
+      // Count every uphill step; smoothing already removes DEM jitter.
+      if (d > 0) gain += d;
     }
     return gain.round();
   }
 
-  /// Cap absurd values; when a profile exists it is the source of truth so the
-  /// Climb number matches the elevation chart.
-  static int sanitizeAscent({
-    required int ascentM,
+  /// Pick climb for a route: prefer router ascent, else full-sample sum.
+  static int resolveClimb({
+    required int apiAscentM,
     required double distanceKm,
-    List<double>? elevations,
+    List<double>? fullElevations,
   }) {
-    final fromProfile = (elevations != null && elevations.length >= 2)
-        ? ascentMeters(elevations)
+    final fromSamples = (fullElevations != null && fullElevations.length >= 2)
+        ? cumulativeAscent(fullElevations)
         : 0;
 
-    // Prefer profile-derived climb whenever we can draw a chart from it.
-    final chosen = fromProfile > 0
-        ? fromProfile
-        : (ascentM > 0 ? ascentM : 0);
+    int chosen;
+    if (apiAscentM > 0 && fromSamples > 0) {
+      // Router ascent is computed on the full path — trust it when sane.
+      // If samples show clearly more climb (API missing downs/ups), take max.
+      if (apiAscentM > 8000 && apiAscentM > fromSamples * 2.5) {
+        chosen = fromSamples;
+      } else {
+        chosen = math.max(apiAscentM, fromSamples);
+      }
+    } else if (apiAscentM > 0) {
+      chosen = apiAscentM;
+    } else {
+      chosen = fromSamples;
+    }
 
-    return _capByDistance(chosen, distanceKm);
+    return _capAbsurd(chosen, distanceKm);
   }
 
-  static int _capByDistance(int ascentM, double distanceKm) {
+  static int _capAbsurd(int ascentM, double distanceKm) {
     if (ascentM <= 0) return 0;
-    final byDistance = distanceKm <= 0
-        ? 6000
-        : (distanceKm * 180).round().clamp(200, 8000);
-    return math.min(ascentM, byDistance);
+    // ~25% average grade over the whole distance is already extreme for bikes.
+    final maxReasonable = distanceKm <= 0
+        ? 8000
+        : (distanceKm * 250).round().clamp(300, 12000);
+    return math.min(ascentM, maxReasonable);
   }
 
-  static List<double> profilePoints(List<double> elevations, {int max = 48}) {
+  /// Chart series only (for drawing). Do not use this for climb totals.
+  static List<double> profilePoints(List<double> elevations, {int max = 64}) {
     if (elevations.isEmpty) return const [];
     final s = smooth(elevations, window: 5);
     if (s.length <= max) return s;
@@ -78,11 +92,5 @@ abstract final class ElevationMath {
       out.add(s[idx]);
     }
     return out;
-  }
-
-  /// Climb for an already-smoothed / downsampled chart series.
-  static int climbFromProfile(List<double> profile) {
-    if (profile.length < 2) return 0;
-    return ascentMeters(profile, minStepM: 0.5, smoothWindow: 1);
   }
 }

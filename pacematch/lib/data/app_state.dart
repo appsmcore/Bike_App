@@ -5,43 +5,41 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
+import '../services/backend_sync_service.dart';
+import '../services/local_profile_store.dart';
 import 'fake_data.dart';
 import 'models.dart';
 import 'route_models.dart';
 
 class AppState extends ChangeNotifier {
+  AppState() {
+    if (!AuthService.isConfigured) {
+      _seedDemoCatalog();
+    }
+  }
+
   bool isAuthenticated = false;
   bool onboardingComplete = false;
   bool authReady = false;
+  bool syncing = false;
+  String? syncError;
   ThemeMode themeMode = ThemeMode.system;
   bool get usesBackendAuth => AuthService.isConfigured;
 
   UserProfile profile = demoProfile;
-  final Map<String, RsvpStatus> rsvps = {
-    'ride-road-1': RsvpStatus.joined,
-    'ride-gravel-1': RsvpStatus.joined,
-    'ride-mtb-1': RsvpStatus.maybe,
-    'ride-past-1': RsvpStatus.joined,
-    'ride-past-2': RsvpStatus.joined,
-    'ride-past-3': RsvpStatus.joined,
-    'ride-past-4': RsvpStatus.joined,
-    'ride-past-5': RsvpStatus.joined,
-    'ride-offered-1': RsvpStatus.joined,
-    'ride-offered-2': RsvpStatus.joined,
-  };
-  final Set<String> joinedGroupIds = {'g1', 'g3'};
+  final Map<String, RsvpStatus> rsvps = {};
+  final Set<String> joinedGroupIds = {};
 
-  late final List<Ride> _rides = createDemoRides();
-  late final List<CyclingGroup> _groups = createDemoGroups();
-  late final List<RiderProfile> _riders = createDemoRiders();
-  late final Map<String, List<String>> _rideParticipantIds =
-      createDemoRideParticipants();
-  late final List<RidePhoto> _ridePhotos = createDemoRidePhotos();
-  late final List<GroupMessage> _groupMessages = createDemoGroupMessages();
+  List<Ride> _rides = [];
+  List<CyclingGroup> _groups = [];
+  List<RiderProfile> _riders = [];
+  Map<String, List<String>> _rideParticipantIds = {};
+  List<RidePhoto> _ridePhotos = [];
+  List<GroupMessage> _groupMessages = [];
   final List<SavedRoute> _savedRoutes = [];
 
   // Onboarding draft
-  final Set<BikeType> draftBikes = {BikeType.road};
+  final Set<BikeType> draftBikes = {};
   FitnessLevel draftFitness = FitnessLevel.intermediate;
   final Set<String> draftDays = {'Sat', 'Sun'};
   RangeValues draftDistance = const RangeValues(40, 100);
@@ -63,34 +61,199 @@ class AppState extends ChangeNotifier {
       return;
     }
 
-    _applySupabaseUser(AuthService.currentUser);
+    _applySupabaseUser(AuthService.currentUser, notify: false);
+    if (AuthService.hasSession) {
+      await _restoreSessionProfile();
+      await refreshSharedData();
+    }
     _authSubscription = AuthService.authStateChanges.listen((event) {
-      _applySupabaseUser(event.session?.user);
+      final user = event.session?.user;
+      if (user == null) {
+        _applySupabaseUser(null);
+        return;
+      }
+      // Skip duplicate handling when loginWithPassword already applied this user.
+      final already = isAuthenticated && profile.id == user.id;
+      _applySupabaseUser(user, notify: false);
+      unawaited(() async {
+        if (!already || !onboardingComplete) {
+          await _restoreSessionProfile();
+        }
+        await refreshSharedData();
+        notifyListeners();
+      }());
     });
     authReady = true;
     notifyListeners();
   }
 
-  void _applySupabaseUser(User? user) {
+  void _seedDemoCatalog() {
+    _rides = createDemoRides();
+    _groups = createDemoGroups();
+    _riders = createDemoRiders();
+    _rideParticipantIds = createDemoRideParticipants();
+    _ridePhotos = createDemoRidePhotos();
+    _groupMessages = createDemoGroupMessages();
+    joinedGroupIds
+      ..clear()
+      ..addAll({'g1', 'g3'});
+    rsvps
+      ..clear()
+      ..addAll({
+        'ride-road-1': RsvpStatus.joined,
+        'ride-gravel-1': RsvpStatus.joined,
+        'ride-mtb-1': RsvpStatus.maybe,
+        'ride-past-1': RsvpStatus.joined,
+        'ride-past-2': RsvpStatus.joined,
+        'ride-past-3': RsvpStatus.joined,
+        'ride-past-4': RsvpStatus.joined,
+        'ride-past-5': RsvpStatus.joined,
+        'ride-offered-1': RsvpStatus.joined,
+        'ride-offered-2': RsvpStatus.joined,
+      });
+  }
+
+  /// Pull groups, rides, memberships and RSVPs from Supabase.
+  Future<void> refreshSharedData() async {
+    if (!BackendSyncService.isAvailable) return;
+    syncing = true;
+    syncError = null;
+    notifyListeners();
+    try {
+      final catalog = await BackendSyncService.fetchCatalog();
+      _groups
+        ..clear()
+        ..addAll(catalog.groups);
+      _rides
+        ..clear()
+        ..addAll(catalog.rides);
+      joinedGroupIds
+        ..clear()
+        ..addAll(catalog.joinedGroupIds);
+      rsvps
+        ..clear()
+        ..addAll(catalog.rsvps);
+      _rideParticipantIds
+        ..clear()
+        ..addAll(
+          catalog.rideParticipantIds.map(
+            (key, value) => MapEntry(key, List<String>.from(value)),
+          ),
+        );
+      // Keep local demos for riders/photos/chat until those are synced too.
+      if (_riders.isEmpty) {
+        _riders = createDemoRiders();
+      }
+    } catch (e) {
+      syncError = e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      syncing = false;
+      notifyListeners();
+    }
+  }
+
+  void _applySupabaseUser(User? user, {bool notify = true}) {
     if (user == null) {
       if (isAuthenticated) {
         isAuthenticated = false;
         onboardingComplete = false;
         profile = demoProfile;
         rsvps.clear();
-        notifyListeners();
+        joinedGroupIds.clear();
+        _rides.clear();
+        _groups.clear();
+        if (notify) notifyListeners();
       }
       return;
     }
 
     final name = (user.userMetadata?['display_name'] as String?)?.trim();
-    profile = demoProfile.copyWith(
-      id: user.id,
-      name: name?.isNotEmpty == true ? name! : _nameFromEmail(user.email),
-      email: user.email ?? profile.email,
-    );
+    final email = (user.email ?? profile.email).trim().toLowerCase();
+    final displayName =
+        name?.isNotEmpty == true ? name! : _nameFromEmail(user.email);
+    final sameUser = isAuthenticated && profile.id == user.id;
+
+    if (sameUser) {
+      // Keep onboarding prefs already restored for this session.
+      profile = profile.copyWith(
+        name: displayName,
+        email: email,
+      );
+    } else {
+      profile = demoProfile.copyWith(
+        id: user.id,
+        name: displayName,
+        email: email,
+      );
+      onboardingComplete = false;
+    }
     isAuthenticated = true;
+    if (notify) notifyListeners();
+  }
+
+  /// Load bike/fitness prefs from device so onboarding runs only once per account.
+  Future<void> restoreSavedProfile() async {
+    await _restoreSessionProfile();
     notifyListeners();
+  }
+
+  Future<void> _restoreSessionProfile() async {
+    final saved = await LocalProfileStore.load(
+      userId: profile.id,
+      email: profile.email,
+    );
+    // Only set true when we find a completed profile. Never force false here —
+    // a concurrent restore race must not wipe a successful load.
+    if (saved == null || !saved.onboardingComplete) return;
+
+    profile = profile.copyWith(
+      name: saved.name ?? profile.name,
+      email: saved.email ?? profile.email,
+      location: saved.location ?? profile.location,
+      bio: saved.bio ?? profile.bio,
+      bikeTypes: saved.bikeTypes.isEmpty ? profile.bikeTypes : saved.bikeTypes,
+      fitnessLevel: saved.fitnessLevel,
+      preferredDays: saved.preferredDays.isEmpty
+          ? profile.preferredDays
+          : saved.preferredDays,
+      preferredDistanceMin: saved.preferredDistanceMin,
+      preferredDistanceMax: saved.preferredDistanceMax,
+      preferredElevationMin: saved.preferredElevationMin,
+      preferredElevationMax: saved.preferredElevationMax,
+      preferredTerrains: saved.preferredTerrains.isEmpty
+          ? profile.preferredTerrains
+          : saved.preferredTerrains,
+    );
+    _syncDraftFromProfile();
+    onboardingComplete = true;
+  }
+
+  void _syncDraftFromProfile() {
+    draftBikes
+      ..clear()
+      ..addAll(profile.bikeTypes);
+    draftFitness = profile.fitnessLevel;
+    draftDays
+      ..clear()
+      ..addAll(profile.preferredDays);
+    draftDistance = RangeValues(
+      profile.preferredDistanceMin,
+      profile.preferredDistanceMax,
+    );
+    draftElevation = RangeValues(
+      profile.preferredElevationMin.toDouble(),
+      profile.preferredElevationMax.toDouble(),
+    );
+    draftTerrains
+      ..clear()
+      ..addAll(profile.preferredTerrains);
+  }
+
+  Future<void> _persistProfilePrefs() async {
+    await LocalProfileStore.save(
+      profile: profile,
+      onboardingComplete: onboardingComplete,
+    );
   }
 
   String _nameFromEmail(String? email) {
@@ -251,7 +414,39 @@ class AppState extends ChangeNotifier {
       list.remove(currentUserId);
     }
 
+    final ride = rideById(rideId);
+    if (ride != null) {
+      final idx = _rides.indexWhere((r) => r.id == rideId);
+      if (idx >= 0) {
+        _rides[idx] = Ride(
+          id: ride.id,
+          title: ride.title,
+          description: ride.description,
+          startsAt: ride.startsAt,
+          meetingPoint: ride.meetingPoint,
+          bikeType: ride.bikeType,
+          distanceKm: ride.distanceKm,
+          elevationM: ride.elevationM,
+          participants: list.length,
+          riderLimit: ride.riderLimit,
+          difficulty: ride.difficulty,
+          skillLevel: ride.skillLevel,
+          groupId: ride.groupId,
+          groupName: ride.groupName,
+          coverGradient: ride.coverGradient,
+          elevationProfile: ride.elevationProfile,
+          startLat: ride.startLat,
+          startLng: ride.startLng,
+          organizerId: ride.organizerId,
+          routeLatLngs: ride.routeLatLngs,
+        );
+      }
+    }
+
     notifyListeners();
+    if (BackendSyncService.isAvailable) {
+      unawaited(BackendSyncService.setRsvp(rideId: rideId, status: status));
+    }
   }
 
   void toggleTheme() {
@@ -268,26 +463,30 @@ class AppState extends ChangeNotifier {
     required String password,
   }) async {
     if (!usesBackendAuth) {
-      login(email: email);
+      login(email: email, notify: false);
+      await _restoreSessionProfile();
+      notifyListeners();
       return AuthResult.ok();
     }
 
     final result = await AuthService.signIn(email: email, password: password);
     if (result.success) {
-      _applySupabaseUser(AuthService.currentUser);
+      _applySupabaseUser(AuthService.currentUser, notify: false);
+      await _restoreSessionProfile();
+      notifyListeners();
     }
     return result;
   }
 
-  void login({String? email, String? name}) {
+  void login({String? email, String? name, bool notify = true}) {
     isAuthenticated = true;
     if (email != null || name != null) {
       profile = profile.copyWith(
-        email: email ?? profile.email,
+        email: email?.trim().toLowerCase() ?? profile.email,
         name: name ?? profile.name,
       );
     }
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   Future<AuthResult> registerAccount({
@@ -296,7 +495,7 @@ class AppState extends ChangeNotifier {
     required String password,
   }) async {
     if (!usesBackendAuth) {
-      register(name: name, email: email);
+      await register(name: name, email: email);
       return AuthResult.ok();
     }
 
@@ -306,16 +505,22 @@ class AppState extends ChangeNotifier {
       password: password,
     );
     if (result.success) {
-      _applySupabaseUser(AuthService.currentUser);
+      _applySupabaseUser(AuthService.currentUser, notify: false);
       onboardingComplete = false;
+      await LocalProfileStore.clear(
+        userId: AuthService.currentUser?.id,
+        email: email,
+      );
+      notifyListeners();
     }
     return result;
   }
 
-  void register({required String name, required String email}) {
+  Future<void> register({required String name, required String email}) async {
     profile = profile.copyWith(name: name, email: email);
     isAuthenticated = true;
     onboardingComplete = false;
+    await LocalProfileStore.clear(userId: profile.id, email: email);
     notifyListeners();
   }
 
@@ -330,11 +535,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void completeOnboarding() {
+  Future<void> completeOnboarding() async {
     if (draftTerrains.isEmpty) {
       draftTerrains.addAll({TerrainPref.flat, TerrainPref.climbs});
     }
     profile = profile.copyWith(
+      email: profile.email.trim().toLowerCase(),
       bikeTypes: draftBikes.toList(),
       fitnessLevel: draftFitness,
       preferredDays: draftDays.toList(),
@@ -345,12 +551,13 @@ class AppState extends ChangeNotifier {
       preferredTerrains: draftTerrains.toList(),
     );
     onboardingComplete = true;
+    await _persistProfilePrefs();
     notifyListeners();
   }
 
   void toggleDraftBike(BikeType type) {
     if (draftBikes.contains(type)) {
-      if (draftBikes.length > 1) draftBikes.remove(type);
+      draftBikes.remove(type);
     } else {
       draftBikes.add(type);
     }
@@ -372,12 +579,18 @@ class AppState extends ChangeNotifier {
   }
 
   void setDraftDistance(RangeValues values) {
-    draftDistance = values;
+    draftDistance = RangeValues(
+      values.start.clamp(10, 250),
+      values.end.clamp(10, 250),
+    );
     notifyListeners();
   }
 
   void setDraftElevation(RangeValues values) {
-    draftElevation = values;
+    draftElevation = RangeValues(
+      values.start.clamp(0, 6000),
+      values.end.clamp(0, 6000),
+    );
     notifyListeners();
   }
 
@@ -391,22 +604,45 @@ class AppState extends ChangeNotifier {
   }
 
   void toggleGroupMembership(String groupId) {
-    if (joinedGroupIds.contains(groupId)) {
-      joinedGroupIds.remove(groupId);
-    } else {
+    final joining = !joinedGroupIds.contains(groupId);
+    if (joining) {
       joinedGroupIds.add(groupId);
+    } else {
+      joinedGroupIds.remove(groupId);
+    }
+    final group = groupById(groupId);
+    if (group != null) {
+      group.memberCount = (group.memberCount + (joining ? 1 : -1)).clamp(0, 99999);
     }
     notifyListeners();
+    if (BackendSyncService.isAvailable) {
+      unawaited(
+        BackendSyncService.setMembership(groupId: groupId, join: joining),
+      );
+    }
   }
 
   bool isMemberOf(String groupId) => joinedGroupIds.contains(groupId);
 
-  CyclingGroup createGroup({
+  Future<CyclingGroup> createGroup({
     required String name,
     required String description,
     required String location,
     required bool isPrivate,
-  }) {
+  }) async {
+    if (BackendSyncService.isAvailable) {
+      final group = await BackendSyncService.createGroup(
+        name: name,
+        description: description,
+        location: location,
+        isPrivate: isPrivate,
+      );
+      _groups.insert(0, group);
+      joinedGroupIds.add(group.id);
+      notifyListeners();
+      return group;
+    }
+
     final id = 'g-${DateTime.now().millisecondsSinceEpoch}';
     final group = CyclingGroup(
       id: id,
@@ -424,7 +660,7 @@ class AppState extends ChangeNotifier {
     return group;
   }
 
-  Ride createRide({
+  Future<Ride> createRide({
     required String title,
     required String description,
     required DateTime startsAt,
@@ -435,44 +671,76 @@ class AppState extends ChangeNotifier {
     required int riderLimit,
     required Difficulty difficulty,
     required FitnessLevel skillLevel,
-    required String groupId,
+    String? groupId,
     double? startLat,
     double? startLng,
     List<double>? elevationProfile,
     List<double> routeLatLngs = const [],
-  }) {
-    final group = groupById(groupId);
-    final id = 'ride-${DateTime.now().millisecondsSinceEpoch}';
-    final ride = Ride(
-      id: id,
-      title: title,
-      description: description,
-      startsAt: startsAt,
-      meetingPoint: meetingPoint,
-      bikeType: bikeType,
-      distanceKm: distanceKm,
-      elevationM: elevationM,
-      participants: 1,
-      riderLimit: riderLimit,
-      difficulty: difficulty,
-      skillLevel: skillLevel,
-      groupId: groupId,
-      groupName: group?.name ?? 'Open ride',
-      organizerId: currentUserId,
-      coverGradient: group?.coverGradient ??
-          const [Color(0xFF1A7A4C), Color(0xFF0B3D28)],
-      elevationProfile: elevationProfile ?? _syntheticProfile(elevationM),
-      startLat: startLat ?? 46.4983,
-      startLng: startLng ?? 11.3548,
-      routeLatLngs: routeLatLngs,
-    );
+  }) async {
+    final resolvedGroupId = (groupId == null || groupId.isEmpty) ? '' : groupId;
+    final group =
+        resolvedGroupId.isEmpty ? null : groupById(resolvedGroupId);
+    final profileElev = elevationProfile ?? _syntheticProfile(elevationM);
+    final lat = startLat ?? 46.4983;
+    final lng = startLng ?? 11.3548;
+    final gradient = group?.coverGradient ??
+        const [Color(0xFF1A7A4C), Color(0xFF0B3D28)];
+    final groupName = group?.name ?? 'Open ride';
+
+    late final Ride ride;
+    if (BackendSyncService.isAvailable) {
+      ride = await BackendSyncService.createRide(
+        title: title,
+        description: description,
+        startsAt: startsAt,
+        meetingPoint: meetingPoint,
+        bikeType: bikeType,
+        distanceKm: distanceKm,
+        elevationM: elevationM,
+        riderLimit: riderLimit,
+        difficulty: difficulty,
+        skillLevel: skillLevel,
+        groupId: resolvedGroupId.isEmpty ? null : resolvedGroupId,
+        groupName: groupName,
+        coverGradient: gradient,
+        elevationProfile: profileElev,
+        startLat: lat,
+        startLng: lng,
+        routeLatLngs: routeLatLngs,
+      );
+    } else {
+      final id = 'ride-${DateTime.now().millisecondsSinceEpoch}';
+      ride = Ride(
+        id: id,
+        title: title,
+        description: description,
+        startsAt: startsAt,
+        meetingPoint: meetingPoint,
+        bikeType: bikeType,
+        distanceKm: distanceKm,
+        elevationM: elevationM,
+        participants: 1,
+        riderLimit: riderLimit,
+        difficulty: difficulty,
+        skillLevel: skillLevel,
+        groupId: resolvedGroupId,
+        groupName: groupName,
+        organizerId: currentUserId,
+        coverGradient: gradient,
+        elevationProfile: profileElev,
+        startLat: lat,
+        startLng: lng,
+        routeLatLngs: routeLatLngs,
+      );
+    }
+
     _rides.insert(0, ride);
-    group?.upcomingRideIds.insert(0, id);
-    rsvps[id] = RsvpStatus.joined;
-    _rideParticipantIds[id] = [currentUserId];
+    group?.upcomingRideIds.insert(0, ride.id);
+    rsvps[ride.id] = RsvpStatus.joined;
+    _rideParticipantIds[ride.id] = [currentUserId];
     profile = profile.copyWith(ridesOrganized: profile.ridesOrganized + 1);
-    if (group != null && !joinedGroupIds.contains(groupId)) {
-      joinedGroupIds.add(groupId);
+    if (group != null && !joinedGroupIds.contains(resolvedGroupId)) {
+      joinedGroupIds.add(resolvedGroupId);
     }
     notifyListeners();
     return ride;

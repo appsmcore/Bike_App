@@ -22,10 +22,9 @@ class ElevationProfileChart extends StatelessWidget {
     final hasData = points.length >= 2;
     final minV = hasData ? points.reduce((a, b) => a < b ? a : b) : 0.0;
     final maxV = hasData ? points.reduce((a, b) => a > b ? a : b) : 0.0;
-    // Always derive climb from the drawn series so the chip matches the curve.
-    final climb = hasData
-        ? ElevationMath.climbFromProfile(points)
-        : (climbM ?? 0);
+    // Prefer stored cumulative climb; chart points alone under-count ups/downs.
+    final climb = climbM ??
+        (hasData ? ElevationMath.cumulativeAscent(points) : 0);
 
     return Container(
       width: double.infinity,

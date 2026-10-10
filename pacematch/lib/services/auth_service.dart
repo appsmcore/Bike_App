@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/supabase_config.dart';
@@ -38,7 +39,12 @@ class AuthResult {
 class AuthService {
   AuthService._();
 
-  static bool get isConfigured => SupabaseConfig.isConfigured;
+  /// True only after [initialize] succeeds. Keys alone are not enough — a hung
+  /// or failed Supabase bootstrap must not keep the UI on the loading screen.
+  static bool _clientReady = false;
+
+  static bool get isConfigured =>
+      SupabaseConfig.isConfigured && _clientReady;
 
   static SupabaseClient get _client => Supabase.instance.client;
 
@@ -52,15 +58,26 @@ class AuthService {
       _client.auth.onAuthStateChange;
 
   static Future<void> initialize() async {
-    if (!isConfigured) return;
+    if (!SupabaseConfig.isConfigured) {
+      _clientReady = false;
+      return;
+    }
 
-    await Supabase.initialize(
-      url: SupabaseConfig.url,
-      publishableKey: SupabaseConfig.anonKey,
-      authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-      ),
-    );
+    try {
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        publishableKey: SupabaseConfig.anonKey,
+        authOptions: const FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.pkce,
+        ),
+      ).timeout(const Duration(seconds: 12));
+      _clientReady = true;
+    } catch (e, st) {
+      _clientReady = false;
+      if (kDebugMode) {
+        debugPrint('Supabase.initialize failed or timed out: $e\n$st');
+      }
+    }
   }
 
   static Future<AuthResult> signIn({

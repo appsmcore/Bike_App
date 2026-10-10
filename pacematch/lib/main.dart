@@ -18,6 +18,7 @@ Future<void> main() async {
   );
 
   await _loadEnv();
+  // Never block the first frame on a slow/unreachable Supabase project.
   await AuthService.initialize();
 
   final appState = AppState();

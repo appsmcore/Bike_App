@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../services/auth_service.dart';
 import '../services/backend_sync_service.dart';
 import '../services/local_profile_store.dart';
@@ -54,6 +53,9 @@ class AppState extends ChangeNotifier {
   StreamSubscription<AuthState>? _authSubscription;
 
   /// Restore Supabase session and listen for sign-in / sign-out.
+  ///
+  /// Marks [authReady] before any network sync so a slow/unreachable Supabase
+  /// project cannot leave the app stuck on the splash / loading screen.
   Future<void> initAuth() async {
     if (!usesBackendAuth) {
       authReady = true;
@@ -62,10 +64,6 @@ class AppState extends ChangeNotifier {
     }
 
     _applySupabaseUser(AuthService.currentUser, notify: false);
-    if (AuthService.hasSession) {
-      await _restoreSessionProfile();
-      await refreshSharedData();
-    }
     _authSubscription = AuthService.authStateChanges.listen((event) {
       final user = event.session?.user;
       if (user == null) {
@@ -83,7 +81,25 @@ class AppState extends ChangeNotifier {
         notifyListeners();
       }());
     });
+
+    // Unblock the UI immediately; hydrate profile + catalog in the background.
     authReady = true;
+    notifyListeners();
+
+    if (AuthService.hasSession) {
+      unawaited(_bootstrapExistingSession());
+    }
+  }
+
+  Future<void> _bootstrapExistingSession() async {
+    try {
+      await _restoreSessionProfile().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Profile restore during bootstrap failed: $e');
+      }
+    }
+    await refreshSharedData();
     notifyListeners();
   }
 
@@ -120,7 +136,9 @@ class AppState extends ChangeNotifier {
     syncError = null;
     notifyListeners();
     try {
-      final catalog = await BackendSyncService.fetchCatalog();
+      final catalog = await BackendSyncService.fetchCatalog().timeout(
+        const Duration(seconds: 15),
+      );
       _groups
         ..clear()
         ..addAll(catalog.groups);
@@ -144,6 +162,8 @@ class AppState extends ChangeNotifier {
       if (_riders.isEmpty) {
         _riders = createDemoRiders();
       }
+    } on TimeoutException {
+      syncError = 'Timed out loading rides. Pull to refresh.';
     } catch (e) {
       syncError = e.toString().replaceFirst('Exception: ', '');
     } finally {

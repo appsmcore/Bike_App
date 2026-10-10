@@ -16,20 +16,38 @@
   <style>
     body { margin: 0; background: #0E1311; }
     .loading {
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      font-family: system-ui, sans-serif; color: #E8F0EC; letter-spacing: 0.12em;
-      font-weight: 600;
+      min-height: 100vh; display: flex; flex-direction: column; gap: 16px;
+      align-items: center; justify-content: center; text-align: center;
+      font-family: system-ui, sans-serif; color: #E8F0EC; padding: 24px;
+    }
+    .loading .brand {
+      letter-spacing: 0.12em; font-weight: 600;
+    }
+    .loading .hint {
+      display: none; max-width: 280px; letter-spacing: 0; font-weight: 400;
+      font-size: 14px; line-height: 1.45; color: #A8B5AF;
     }
   </style>
 </head>
 <body>
-  <div class="loading" id="loading">PACEMATCH</div>
+  <div class="loading" id="loading">
+    <div class="brand">PACEMATCH</div>
+    <div class="hint" id="loading-hint">
+      Still loading… Check your connection, then refresh.
+    </div>
+  </div>
   <script src="flutter_bootstrap.js" async></script>
   <script>
     window.addEventListener('flutter-first-frame', function () {
       var el = document.getElementById('loading');
       if (el) el.remove();
     });
+    // If the engine never paints (hung auth/network), surface a hint instead of
+    // leaving a blank brand splash forever on mobile browsers.
+    setTimeout(function () {
+      var hint = document.getElementById('loading-hint');
+      if (hint) hint.style.display = 'block';
+    }, 10000);
   </script>
 </body>
 </html>
